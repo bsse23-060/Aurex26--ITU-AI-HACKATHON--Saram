@@ -74,16 +74,27 @@ def find_peer_twin(
     if not candidates:
         return None
 
-    keys = sorted({slug for c in candidates for slug in c.get("profile", {}).keys()} | set(learner_profile.keys()))
+    # Mastery keys are concept slugs (scalars). Reserved keys like ``__dna__``
+    # hold structured payloads and must not leak into the mastery vector — if
+    # they do, numpy raises ``inhomogeneous shape`` because it tries to mix
+    # floats with a list.
+    def _scalar_keys(d: Dict[str, object]) -> set[str]:
+        return {k for k in d.keys() if isinstance(k, str) and not k.startswith("__")}
+
+    keys = sorted(
+        {slug for c in candidates for slug in _scalar_keys(c.get("profile", {}))}
+        | _scalar_keys(learner_profile)
+    )
     if not keys:
         return None
 
     def to_vec(profile: Dict[str, float], dna: List[float]) -> np.ndarray:
-        mastery = np.array([profile.get(k, 0.0) for k in keys], dtype=np.float32)
+        mastery = np.array([float(profile.get(k, 0.0) or 0.0) for k in keys], dtype=np.float32)
         dna_arr = np.array(dna or [0.5] * 5, dtype=np.float32)
         return np.concatenate([mastery, 0.5 * dna_arr])
 
-    learner_dna = learner_profile.get("__dna__", [0.5] * 5)
+    raw_dna = learner_profile.get("__dna__", [0.5] * 5)
+    learner_dna = list(raw_dna) if isinstance(raw_dna, (list, tuple)) else [0.5] * 5
     learner_vec = to_vec(learner_profile, learner_dna)
 
     best: TwinMatch | None = None

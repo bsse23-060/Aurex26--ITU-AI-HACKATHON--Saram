@@ -44,6 +44,8 @@ export function StudentTutor() {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [recordedSec, setRecordedSec] = useState(0);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceModeRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderChunksRef = useRef<Blob[]>([]);
   const recorderStreamRef = useRef<MediaStream | null>(null);
@@ -52,21 +54,38 @@ export function StudentTutor() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [followups, setFollowups] = useState<string[]>([]);
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
+  const [pendingPlay, setPendingPlay] = useState<{ url: string; idx: number; text: string } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const sendRef = useRef<((text: string, opts?: { speak?: boolean }) => Promise<void>) | null>(null);
+
+  const voiceModeAvailable = ttsEnabled && sttEnabled;
+
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
+  useEffect(() => {
+    if (!voiceModeAvailable && voiceMode) setVoiceMode(false);
+  }, [voiceModeAvailable, voiceMode]);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-      audioRef.current = null;
+      try {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      } catch {
+        // best-effort cleanup
+      }
     }
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
     setPlayingIdx(null);
+    setPendingPlay(null);
   }, []);
 
   useEffect(() => () => stopAudio(), [stopAudio]);
@@ -81,6 +100,8 @@ export function StudentTutor() {
       setPlayingIdx(idx);
       try {
         const base = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+        // eslint-disable-next-line no-console
+        console.debug("[tutor] requesting ElevenLabs TTS", { idx, chars: text.length });
         const res = await fetch(`${base}/api/tutor/voice/tts`, {
           method: "POST",
           headers: {
@@ -100,26 +121,66 @@ export function StudentTutor() {
           throw new Error(detail);
         }
         const blob = await res.blob();
-        if (!blob.size || !blob.type.startsWith("audio/")) {
-          throw new Error("Empty audio response");
+        // eslint-disable-next-line no-console
+        console.debug("[tutor] ElevenLabs audio blob", { size: blob.size, type: blob.type });
+        if (!blob.size) {
+          throw new Error("Empty audio response from ElevenLabs");
         }
-        const url = URL.createObjectURL(blob);
+        const audioBlob = blob.type.startsWith("audio/")
+          ? blob
+          : blob.slice(0, blob.size, "audio/mpeg");
+        const url = URL.createObjectURL(audioBlob);
         objectUrlRef.current = url;
-        const audio = new Audio(url);
+
+        const audio = audioRef.current ?? new Audio();
         audioRef.current = audio;
-        audio.addEventListener("ended", stopAudio);
-        audio.addEventListener("error", () => {
-          toast.warn("Could not play audio.", "ElevenLabs");
-          stopAudio();
-        });
-        await audio.play();
+        audio.src = url;
+        audio.preload = "auto";
+        audio.volume = 1.0;
+        audio.muted = false;
+        try {
+          audio.load();
+        } catch {
+          // ignore: some browsers throw when load() is called before metadata
+        }
+        try {
+          await audio.play();
+          // eslint-disable-next-line no-console
+          console.debug("[tutor] ElevenLabs playback started");
+        } catch (playErr) {
+          // eslint-disable-next-line no-console
+          console.warn("[tutor] autoplay blocked by browser", playErr);
+          setPendingPlay({ url, idx, text });
+          setPlayingIdx(null);
+          toast.warn(
+            "Browser blocked autoplay. Tap “Tap to hear reply” to play.",
+            "ElevenLabs",
+          );
+        }
       } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("[tutor] ElevenLabs TTS failed", err);
         toast.fail((err as Error).message, "ElevenLabs");
         stopAudio();
       }
     },
     [playingIdx, stopAudio, toast, token],
   );
+
+  const playPending = useCallback(async () => {
+    const pending = pendingPlay;
+    if (!pending || !audioRef.current) return;
+    try {
+      setPlayingIdx(pending.idx);
+      setPendingPlay(null);
+      await audioRef.current.play();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[tutor] manual play failed", err);
+      toast.fail((err as Error).message, "ElevenLabs");
+      stopAudio();
+    }
+  }, [pendingPlay, stopAudio, toast]);
 
   useEffect(() => {
     endpoints.tutorHistory(20, token).then((rows) => {
@@ -224,9 +285,14 @@ export function StudentTutor() {
           toast.warn("No speech detected.", "Voice input");
           return;
         }
-        setInput((curr) => (curr ? `${curr.trim()} ${cleaned}` : cleaned));
-        inputRef.current?.focus();
-        toast.success(`Transcribed (${out.language})`, "Voice input");
+        if (sendRef.current) {
+          toast.success(`Heard you in ${out.language} · sending…`, "Voice assistant");
+          void sendRef.current(cleaned, { speak: true });
+        } else {
+          setInput((curr) => (curr ? `${curr.trim()} ${cleaned}` : cleaned));
+          inputRef.current?.focus();
+          toast.success(`Transcribed (${out.language})`, "Voice input");
+        }
       } catch (err) {
         toast.fail((err as Error).message, "Voice input");
       } finally {
@@ -255,58 +321,176 @@ export function StudentTutor() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
 
-  async function send(text?: string) {
-    const m = (text ?? input).trim();
-    if (!m || busy) return;
-    setBusy(true);
-    setInput("");
-    setMessages((curr) => [...curr, { role: "user", content: m }, { role: "assistant", content: "", pending: true }]);
-    try {
-      const res = await endpoints.tutorAsk({ message: m }, token);
-      setMessages((curr) => {
-        const next = curr.slice(0, -1);
-        next.push({
-          role: "assistant",
-          content: res.reply,
-          language: res.language,
-          citations: res.citations,
+  const send = useCallback(
+    async (text?: string, opts?: { speak?: boolean }) => {
+      const m = (text ?? input).trim();
+      if (!m || busy) return;
+      const shouldSpeak = (opts?.speak ?? false) || voiceModeRef.current;
+      setBusy(true);
+      setInput("");
+      setMessages((curr) => [
+        ...curr,
+        { role: "user", content: m },
+        { role: "assistant", content: "", pending: true },
+      ]);
+      try {
+        const res = await endpoints.tutorAsk({ message: m }, token);
+        let assistantIdx = -1;
+        setMessages((curr) => {
+          const next = curr.slice(0, -1);
+          next.push({
+            role: "assistant",
+            content: res.reply,
+            language: res.language,
+            citations: res.citations,
+          });
+          assistantIdx = next.length - 1;
+          return next;
         });
-        return next;
-      });
-      setFollowups(res.suggested_followups);
-    } catch (err) {
-      setMessages((curr) => curr.slice(0, -1));
-      toast.fail((err as Error).message, "Tutor failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+        setFollowups(res.suggested_followups);
+        if (shouldSpeak && ttsEnabled && assistantIdx >= 0 && res.reply) {
+          void playMessage(assistantIdx, res.reply);
+        }
+      } catch (err) {
+        setMessages((curr) => curr.slice(0, -1));
+        toast.fail((err as Error).message, "Tutor failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, input, playMessage, toast, token, ttsEnabled],
+  );
+
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
+  const voiceToggleTitle = !voiceModeAvailable
+    ? "Configure ELEVENLABS_API_KEY + GROQ_API_KEY in backend/.env to enable voice"
+    : voiceMode
+      ? "Voice assistant on — every reply is spoken aloud via ElevenLabs"
+      : "Tap the mic to talk; replies are spoken via ElevenLabs. Toggle on to also speak typed replies.";
+  const speaking = playingIdx !== null;
 
   return (
-    <div className="grid gap-24 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col h-[calc(100vh-160px)] min-h-[560px]">
-        <header className="mb-16 flex items-end justify-between gap-16">
-          <div>
+    <div className="grid gap-16 sm:gap-24 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <audio
+        ref={audioRef}
+        playsInline
+        preload="auto"
+        onEnded={stopAudio}
+        onError={() => {
+          // eslint-disable-next-line no-console
+          console.warn("[tutor] audio element fired error", audioRef.current?.error);
+          stopAudio();
+        }}
+        className="hidden"
+      />
+      <div className="flex flex-col min-w-0 min-h-[460px] h-[calc(100dvh-160px)] lg:min-h-[560px]">
+        <header className="mb-12 sm:mb-16 flex flex-col gap-12 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <p className="label-caps text-secondary">AI tutor</p>
-            <h1 className="display text-30 leading-tight">Ask anything · code-switch friendly</h1>
+            <h1 className="display text-22 sm:text-26 md:text-30 leading-tight">
+              Ask anything · code-switch friendly
+            </h1>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-12 text-ink/55 font-body">
-            {ttsEnabled && (
-              <span className="inline-flex items-center gap-4 rounded-sm border border-line bg-surface px-8 py-4">
-                <Icon name="speaker" size={12} /> TTS
+          <div className="flex flex-wrap items-center gap-8 font-body">
+            <button
+              type="button"
+              onClick={() => setVoiceMode((v) => !v)}
+              disabled={!voiceModeAvailable}
+              aria-pressed={voiceMode}
+              title={voiceToggleTitle}
+              className={cn(
+                "inline-flex items-center gap-8 rounded-md border px-12 py-8 text-13 transition-colors",
+                voiceMode
+                  ? "border-primary bg-primary text-surface shadow-glow"
+                  : voiceModeAvailable
+                    ? "border-line bg-surface text-ink hover:border-primary/40 hover:bg-aqua-soft"
+                    : "border-line bg-neutral text-ink/40 cursor-not-allowed",
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-flex h-18 w-18 items-center justify-center rounded-full",
+                  voiceMode
+                    ? "bg-surface/25 text-surface"
+                    : voiceModeAvailable
+                      ? "bg-aqua-soft text-primary"
+                      : "bg-neutral text-ink/35",
+                )}
+              >
+                <Icon name="mic" size={12} />
+              </span>
+              <span className="font-medium">
+                {voiceMode ? "Voice on" : "Voice assistant"}
+              </span>
+              <span
+                className={cn(
+                  "rounded-sm px-6 py-2 text-10 uppercase tracking-[0.08em]",
+                  voiceMode
+                    ? "bg-surface/20 text-surface"
+                    : voiceModeAvailable
+                      ? "bg-aqua-soft text-primary"
+                      : "bg-neutral text-ink/40",
+                )}
+              >
+                ElevenLabs
+              </span>
+              {voiceMode && (
+                <span className="inline-block h-6 w-6 rounded-full bg-aqua-bright/90 animate-pulse" aria-hidden />
+              )}
+            </button>
+            {speaking && (
+              <span className="inline-flex items-center gap-6 rounded-md border border-primary/30 bg-aqua-soft px-10 py-6 text-12 text-primary">
+                <Icon name="speaker" size={12} />
+                <span>Speaking via ElevenLabs…</span>
+                <button
+                  type="button"
+                  onClick={stopAudio}
+                  className="ml-4 rounded-sm border border-primary/40 px-6 py-1 text-11 hover:bg-mint"
+                >
+                  stop
+                </button>
               </span>
             )}
-            {sttEnabled && (
-              <span className="inline-flex items-center gap-4 rounded-sm border border-line bg-surface px-8 py-4">
-                <Icon name="mic" size={12} /> STT
-              </span>
+            {pendingPlay && !speaking && (
+              <button
+                type="button"
+                onClick={playPending}
+                className="inline-flex items-center gap-6 rounded-md border border-warning/40 bg-warning/10 px-10 py-6 text-12 text-warning hover:bg-warning/20"
+                title="Browser blocked autoplay — tap to hear the reply"
+              >
+                <Icon name="speaker" size={12} />
+                Tap to hear reply
+              </button>
             )}
+            <div className="hidden md:flex items-center gap-8 text-12 text-ink/55">
+              {ttsEnabled && (
+                <span className="inline-flex items-center gap-4 rounded-sm border border-line bg-surface px-8 py-4">
+                  <Icon name="speaker" size={12} /> TTS
+                </span>
+              )}
+              {sttEnabled && (
+                <span className="inline-flex items-center gap-4 rounded-sm border border-line bg-surface px-8 py-4">
+                  <Icon name="mic" size={12} /> STT
+                </span>
+              )}
+            </div>
           </div>
         </header>
         <Card className="flex-1 flex flex-col p-0 overflow-hidden" pad="sm">
+          {voiceMode && (
+            <div className="flex items-center gap-8 border-b border-line bg-aqua-soft/60 px-12 sm:px-20 py-8 font-body text-12 text-primary">
+              <span className="inline-block h-6 w-6 shrink-0 rounded-full bg-primary animate-pulse" aria-hidden />
+              <span className="leading-snug">
+                Voice mode is on — tap the mic to speak; replies will be spoken aloud.
+              </span>
+            </div>
+          )}
           <div
             ref={listRef}
-            className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-20 py-24 space-y-16 bg-canvas/40"
+            className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-12 sm:px-20 py-16 sm:py-24 space-y-14 sm:space-y-16 bg-canvas/40"
           >
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center text-ink/55 py-32">
@@ -339,7 +523,7 @@ export function StudentTutor() {
                   )}
                   <div
                     className={cn(
-                      "max-w-[78%] rounded-lg border px-16 py-12 text-14 leading-relaxed shadow-artistic",
+                      "max-w-[88%] sm:max-w-[78%] min-w-0 rounded-lg border px-12 sm:px-16 py-10 sm:py-12 text-14 leading-relaxed shadow-artistic",
                       m.role === "user"
                         ? "bg-primary text-surface border-primary"
                         : "bg-mint/40 text-ink border-line",
@@ -421,10 +605,12 @@ export function StudentTutor() {
                     ? "Listening…"
                     : transcribing
                       ? "Transcribing…"
-                      : "Ask in English or Roman Urdu…"
+                      : voiceMode
+                        ? "Tap the mic to talk — or type…"
+                        : "Ask in English or Roman Urdu…"
                 }
                 disabled={recording || transcribing}
-                className="flex-1 min-w-0 rounded-md border border-line bg-surface px-16 font-body text-15 leading-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 disabled:bg-neutral disabled:text-ink/55"
+                className="flex-1 min-w-0 rounded-md border border-line bg-surface px-12 sm:px-16 font-body text-15 leading-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 disabled:bg-neutral disabled:text-ink/55"
                 style={{ height: 44 }}
               />
               {sttEnabled && (
@@ -439,10 +625,12 @@ export function StudentTutor() {
                       ? "border-danger bg-danger text-surface animate-pulse"
                       : transcribing
                         ? "border-line bg-neutral text-ink/40 cursor-wait"
-                        : "border-line bg-surface text-ink hover:border-primary/40 hover:bg-aqua-soft",
+                        : voiceMode
+                          ? "border-primary bg-aqua-soft text-primary hover:bg-mint"
+                          : "border-line bg-surface text-ink hover:border-primary/40 hover:bg-aqua-soft",
                   )}
                   style={{ width: 44, height: 44 }}
-                  title={recording ? "Stop recording" : "Click to speak"}
+                  title={recording ? "Stop recording" : voiceMode ? "Talk to the tutor" : "Click to speak"}
                 >
                   <Icon name="mic" size={18} />
                 </button>
