@@ -1,0 +1,6 @@
+name,goal,background,weekly_hours,language,confidence,baseline_quiz,attendance_rate,activity_rate,motivation_style,barriers,weak_skills
+Ayesha,Get a junior data analyst job in Karachi,Fresh BBA graduate with strong Excel basics and weak SQL,7,Mixed,3,58,84,66,job readiness,needs interview portfolio|gets stuck on SQL joins,sql|data storytelling
+Bilal,Automate daily office reporting with AI agents,Busy operations manager with no coding background,4,Urdu,2,46,72,48,saving time at work,limited study time|low coding confidence,prompting|workflow automation|apis
+Hina,Build AI projects for university portfolio,CS student comfortable with Python but new to RAG,10,English,4,76,94,88,portfolio progress,wants harder projects,rag|evaluation
+Omar,Learn Python foundations before applying to bootcamps,First-year engineering student and beginner programmer,6,Mixed,2,39,68,52,small wins,debugging anxiety|missed last assignment,python|logic
+
