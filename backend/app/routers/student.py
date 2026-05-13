@@ -83,6 +83,7 @@ def get_roadmap(
             continue
         steps.append(
             RoadmapStepOut(
+                id=row.id,
                 position=row.position,
                 module_id=row.module_id,
                 module_title=module.title,
@@ -342,6 +343,7 @@ def complete_roadmap_step(
     module = db.get(Module, row.module_id)
     db.commit()
     return RoadmapStepOut(
+        id=row.id,
         position=row.position,
         module_id=row.module_id,
         module_title=module.title if module else "",

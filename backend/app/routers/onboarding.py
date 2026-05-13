@@ -201,6 +201,16 @@ def complete_onboarding(
             )
         )
     db.commit()
+    # Re-read with ids so the frontend can mark steps complete.
+    rows = (
+        db.query(RoadmapStep)
+        .filter(RoadmapStep.user_id == user.id)
+        .order_by(RoadmapStep.position)
+        .all()
+    )
+    by_position = {r.position: r.id for r in rows}
+    for s in steps_out:
+        s.id = by_position.get(s.position)
 
     return RoadmapOut(
         course_id=course.id,
