@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 
 from .bootstrap import startup
 from .config import settings
+from .routers import admin_courses as admin_courses_router
 from .routers import auth as auth_router
 from .routers import courses as courses_router
 from .routers import graph_career_twin as gct_router
@@ -99,3 +100,4 @@ app.include_router(student_router.router)
 app.include_router(gct_router.router)
 app.include_router(tutor_router.router)
 app.include_router(instructor_router.router)
+app.include_router(admin_courses_router.router)

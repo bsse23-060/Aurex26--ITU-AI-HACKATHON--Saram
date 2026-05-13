@@ -15,6 +15,7 @@ import { ModulePage } from "./pages/ModulePage";
 import { InstructorHome } from "./pages/InstructorHome";
 import { InstructorStudent } from "./pages/InstructorStudent";
 import { AdminHome } from "./pages/AdminHome";
+import { AdminCourses } from "./pages/AdminCourses";
 import { LandingPage } from "./pages/LandingPage";
 
 function HomeGate() {
@@ -142,6 +143,14 @@ export default function App() {
             element={
               <Guard roles={["admin"]}>
                 <AdminHome />
+              </Guard>
+            }
+          />
+          <Route
+            path="/admin/courses"
+            element={
+              <Guard roles={["admin"]}>
+                <AdminCourses />
               </Guard>
             }
           />
