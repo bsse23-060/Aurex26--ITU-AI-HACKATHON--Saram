@@ -32,14 +32,14 @@ export function InstructorStudent() {
           <Avatar name={s.full_name} seed={s.avatar_seed} size={64} ring />
           <div>
             <h1 className="display text-36">{s.full_name}</h1>
-            <p className="text-12 font-mono text-ink/60">
+            <p className="text-12 font-body text-ink/60">
               {s.email} · {s.course_title}
             </p>
           </div>
           <div className="ml-auto text-right">
             <Badge tone={tone}>Risk {fmtPct(s.risk_prob)}</Badge>
             {s.burnout_flag && (
-              <span className="block text-12 font-mono text-warning mt-4">
+              <span className="block text-12 font-body text-warning mt-4">
                 <Icon name="fire" size={12} /> burnout
               </span>
             )}
@@ -62,7 +62,7 @@ export function InstructorStudent() {
               <li key={r.feature} className="rounded-md border-2 border-ink/10 p-12">
                 <p className="display text-16">{r.label}</p>
                 <ProgressBar value={Math.min(1, Math.abs(r.contribution))} tone="warning" />
-                <p className="text-12 font-mono text-ink/50 mt-4">
+                <p className="text-12 font-body text-ink/50 mt-4">
                   feature · {r.feature} · contribution {r.contribution.toFixed(2)}
                 </p>
               </li>
@@ -84,7 +84,7 @@ export function InstructorStudent() {
                   <p className="display text-14">{c.concept_name}</p>
                   <p className="text-12 text-ink/50">{c.module_title}</p>
                   <ProgressBar value={c.avg_mastery} tone={c.avg_mastery < 0.4 ? "danger" : "primary"} />
-                  <p className="text-12 mt-2 text-ink/50 font-mono">{fmtPct(c.avg_mastery)}</p>
+                  <p className="text-12 mt-2 text-ink/50 font-body">{fmtPct(c.avg_mastery)}</p>
                 </li>
               ))}
           </ul>

@@ -67,8 +67,8 @@ export function StudentSkillGraph() {
             >
               <defs>
                 <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.7" />
-                  <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.4" />
+                  <stop offset="0%" stopColor="#a3a3a3" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#737373" stopOpacity="0.5" />
                 </linearGradient>
               </defs>
               {graph.edges.map((e, i) => {
@@ -92,10 +92,10 @@ export function StudentSkillGraph() {
                 const r = 12 + n.p_mastery * 12;
                 const fill =
                   n.state === "mastered"
-                    ? "#16A34A"
+                    ? "#525252"
                     : n.state === "learning"
-                      ? "#3B82F6"
-                      : "rgba(17,24,39,0.25)";
+                      ? "#a3a3a3"
+                      : "rgba(163,163,163,0.35)";
                 return (
                   <motion.g
                     key={n.id}

@@ -49,7 +49,7 @@ export function AdminHome() {
             >
               <div className="flex items-baseline justify-between mb-4">
                 <span className="display text-18">{f.label}</span>
-                <span className="font-mono text-secondary">{f.count}</span>
+                <span className="font-body text-secondary">{f.count}</span>
               </div>
               <ProgressBar value={f.count / funnelMax} tone="gradient" />
             </motion.div>
@@ -64,7 +64,7 @@ export function AdminHome() {
             <Card key={t.course_id} accent="secondary" hover>
               <div className="flex items-baseline justify-between mb-8">
                 <h3 className="display text-22">{t.course_title}</h3>
-                <span className="font-mono text-12 text-secondary">{t.enrolled} enrolled</span>
+                <span className="font-body text-12 text-secondary">{t.enrolled} enrolled</span>
               </div>
               <div className="grid gap-12 md:grid-cols-2">
                 <Mini label="Active 7d" value={t.active_last_7d} />
@@ -120,13 +120,7 @@ function Sparkline({ seed }: { seed: number }) {
     .join(" ");
   return (
     <svg viewBox="0 0 168 40" className="mt-12 w-full h-[40px]">
-      <defs>
-        <linearGradient id={`spark${seed}`} x1="0" x2="1">
-          <stop offset="0%" stopColor="#3B82F6" />
-          <stop offset="100%" stopColor="#8B5CF6" />
-        </linearGradient>
-      </defs>
-      <path d={path} stroke={`url(#spark${seed})`} strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d={path} stroke="#525252" strokeWidth="1.5" fill="none" strokeLinecap="round" />
     </svg>
   );
 }

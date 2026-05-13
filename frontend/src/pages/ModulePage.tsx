@@ -134,7 +134,7 @@ export function ModulePage() {
                 </p>
                 <ul className="space-y-4">
                   {detail.refresher_concepts.map((c) => (
-                    <li key={c.id} className="text-14 font-mono text-warning">
+                    <li key={c.id} className="text-14 font-body text-warning">
                       · {c.name}
                     </li>
                   ))}
@@ -202,7 +202,7 @@ export function ModulePage() {
             </AnimatePresence>
           </div>
           <div className="mt-16 flex justify-between">
-            <p className="text-12 text-ink/50 font-mono">{quiz.rationale}</p>
+            <p className="text-12 text-secondary font-body">{quiz.rationale}</p>
             <Button onClick={submit} disabled={selected === null} icon={<Icon name="arrow-right" size={14} />}>
               {idx + 1 === quiz.items.length ? "Finish" : "Next"}
             </Button>

@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, endpoints } from "../lib/api";
 import { useAuth } from "../lib/authStore";
 import { Button } from "../components/ui/Button";
@@ -10,9 +10,9 @@ import { cn } from "../lib/cn";
 type DemoAccount = { role: string; email: string; password: string; label: string };
 
 const roleTone: Record<string, string> = {
-  student: "border-primary text-primary hover:bg-primary",
-  instructor: "border-secondary text-secondary hover:bg-secondary",
-  admin: "border-warning text-warning hover:bg-warning",
+  student: "border-line hover:bg-neutral",
+  instructor: "border-line hover:bg-neutral",
+  admin: "border-line hover:bg-neutral",
 };
 
 function destFor(role: string): string {
@@ -23,12 +23,18 @@ function destFor(role: string): string {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const login = useAuth((s) => s.login);
   const [email, setEmail] = useState("student@atomcamp.dev");
   const [password, setPassword] = useState("student123");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [demos, setDemos] = useState<DemoAccount[]>([]);
+
+  useEffect(() => {
+    const q = params.get("email");
+    if (q) setEmail(q);
+  }, [params]);
 
   useEffect(() => {
     endpoints
@@ -67,23 +73,29 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <BackgroundBlobs />
+    <div className="relative min-h-screen overflow-hidden bg-canvas">
+      <Link
+        to="/"
+        className="absolute left-6 top-6 z-10 text-14 text-secondary transition-colors hover:text-ink sm:left-10"
+      >
+        ← Home
+      </Link>
+      <BackgroundWash />
       <div className="relative mx-auto grid min-h-screen max-w-6xl items-center gap-32 px-24 py-32 lg:grid-cols-2">
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
         >
-          <p className="label-caps text-secondary mb-16">atomcamp · Pakistan</p>
-          <h1 className="display text-48 sm:text-[64px] leading-[1.1] text-ink mb-16">
-            A Smart Adaptive <span className="bg-artistic-gradient bg-clip-text text-transparent">LMS</span>
+          <p className="label-caps mb-16">atomcamp · Pakistan</p>
+          <h1 className="display text-36 sm:text-48 leading-tight text-ink mb-16 font-normal">
+            A Smart Adaptive LMS
           </h1>
-          <p className="max-w-md text-18 text-ink/70 leading-relaxed mb-24">
-            Personalised roadmaps, mastery-tracked adaptive quizzes, a bilingual AI tutor, and
-            real career outcomes — designed for atomcamp learners.
+          <p className="max-w-md text-18 text-secondary leading-relaxed mb-24">
+            Personalised roadmaps, mastery-tracked adaptive quizzes, a bilingual AI tutor, and real
+            career outcomes — designed for atomcamp learners.
           </p>
-          <ul className="space-y-8 text-14 text-ink/80">
+          <ul className="space-y-8 text-14 text-ink/85">
             {[
               "Learning DNA fingerprint at onboarding",
               "Bayesian Knowledge Tracing + FSRS reviews",
@@ -91,7 +103,7 @@ export function LoginPage() {
               "At-risk prediction with plain-English reasons",
             ].map((item) => (
               <li key={item} className="flex items-start gap-12">
-                <span className="mt-4 inline-flex h-4 w-4 rounded-md bg-artistic-gradient" />
+                <span className="mt-4 inline-block h-4 w-4 shrink-0 rounded-sm border border-line bg-neutral" />
                 {item}
               </li>
             ))}
@@ -99,17 +111,17 @@ export function LoginPage() {
         </motion.section>
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15 }}
-          className="card relative p-32 border-t-[8px] border-t-primary"
+          transition={{ duration: 0.45, delay: 0.08 }}
+          className="card relative border-l-[3px] border-l-ink/30 p-24 sm:p-32"
         >
-          <h2 className="display text-30 mb-8">Sign in</h2>
-          <p className="text-14 text-ink/60 mb-24">Use a demo account below or your own credentials.</p>
+          <h2 className="display text-30 mb-8 font-normal">Sign in</h2>
+          <p className="text-14 text-secondary mb-24">Use a demo account below or your own credentials.</p>
 
           {demos.length > 0 && (
             <div className="mb-24 space-y-8">
-              <p className="label-caps text-secondary">Demo accounts</p>
+              <p className="label-caps">Demo accounts</p>
               <div className="flex flex-col gap-8">
                 {demos.map((acc) => (
                   <button
@@ -118,17 +130,19 @@ export function LoginPage() {
                     disabled={loading}
                     onClick={() => quickLogin(acc)}
                     className={cn(
-                      "group w-full text-left rounded-md border-2 px-16 py-12 font-mono text-12 uppercase tracking-wide transition-all hover:text-surface disabled:opacity-50",
-                      roleTone[acc.role] ?? "border-ink/20",
+                      "group w-full rounded-md border bg-surface px-16 py-12 text-left font-body text-14 transition-colors disabled:opacity-50",
+                      roleTone[acc.role] ?? "border-line",
                     )}
                   >
                     <div className="flex items-center justify-between gap-8">
                       <span>{acc.label}</span>
-                      <Icon name="arrow-right" size={14} className="opacity-70 group-hover:translate-x-1 transition-transform" />
+                      <Icon
+                        name="arrow-right"
+                        size={14}
+                        className="opacity-50 transition-transform group-hover:translate-x-1"
+                      />
                     </div>
-                    <p className="mt-4 text-12 normal-case tracking-normal text-ink/50 group-hover:text-surface/80">
-                      {acc.email}
-                    </p>
+                    <p className="mt-4 text-12 text-secondary">{acc.email}</p>
                   </button>
                 ))}
               </div>
@@ -155,7 +169,7 @@ export function LoginPage() {
               />
             </Field>
             {error && (
-              <p className="rounded-md bg-danger/10 border-2 border-danger px-12 py-8 font-mono text-12 text-danger">
+              <p className="rounded-md border border-danger/40 bg-danger/10 px-12 py-8 font-body text-14 text-danger">
                 {error}
               </p>
             )}
@@ -168,19 +182,19 @@ export function LoginPage() {
       <style>{`
         .input {
           width: 100%;
-          border-radius: 8px;
-          border: 2px solid rgba(17, 24, 39, 0.12);
+          border-radius: 6px;
+          border: 1px solid #e5e5e5;
           padding: 12px 14px;
-          font-family: 'Inter', system-ui, sans-serif;
-          font-size: 15px;
-          color: #111827;
-          background: white;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 16px;
+          color: #262626;
+          background: #fff;
           transition: border-color 120ms, box-shadow 120ms;
         }
         .input:focus {
           outline: none;
-          border-color: #3B82F6;
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+          border-color: #404040;
+          box-shadow: 0 0 0 2px rgba(64, 64, 64, 0.12);
         }
       `}</style>
     </div>
@@ -190,18 +204,17 @@ export function LoginPage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="label-caps text-secondary block mb-8">{label}</span>
+      <span className="label-caps block mb-8">{label}</span>
       {children}
     </label>
   );
 }
 
-function BackgroundBlobs() {
+function BackgroundWash() {
   return (
     <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <div className="absolute -top-32 -left-32 h-[420px] w-[420px] rounded-full bg-primary/30 blur-3xl animate-blob-drift" />
-      <div className="absolute -bottom-32 -right-16 h-[460px] w-[460px] rounded-full bg-secondary/30 blur-3xl animate-blob-drift" style={{ animationDelay: "2s" }} />
-      <div className="absolute top-1/3 right-1/3 h-[260px] w-[260px] rounded-full bg-danger/20 blur-3xl animate-blob-drift" style={{ animationDelay: "4s" }} />
+      <div className="absolute -top-40 -right-20 h-[320px] w-[320px] rounded-full bg-neutral blur-3xl opacity-80" />
+      <div className="absolute -bottom-32 -left-20 h-[280px] w-[280px] rounded-full bg-line blur-3xl opacity-60" />
     </div>
   );
 }

@@ -70,7 +70,7 @@ export function InstructorHome() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search learners..."
-            className="rounded-md border-2 border-ink/10 px-12 py-8 text-14 focus:outline-none focus:border-primary"
+            className="rounded-md border-2 border-line px-12 py-8 text-14 focus:outline-none focus:border-ink/30"
           />
           <Filters filter={filter} setFilter={setFilter} />
           <div className="ml-auto flex items-center gap-8">
@@ -78,7 +78,7 @@ export function InstructorHome() {
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="rounded-md border-2 border-ink/10 px-8 py-4 text-12 font-mono uppercase"
+              className="rounded-md border border-line px-8 py-4 font-body text-12 capitalize"
             >
               <option value="risk_prob">Risk</option>
               <option value="mastery_avg">Mastery</option>
@@ -106,7 +106,7 @@ export function InstructorHome() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.02 }}
-                  className="border-t border-ink/5 hover:bg-secondary/5"
+                  className="border-t border-line hover:bg-neutral/80"
                 >
                   <td className="px-16 py-12">
                     <Link to={`/instructor/student/${s.user_id}`} className="flex items-center gap-12">
@@ -122,13 +122,13 @@ export function InstructorHome() {
                   </td>
                   <td className="px-12 py-12 w-32">
                     <ProgressBar value={s.mastery_avg} tone="success" />
-                    <p className="text-12 mt-2 text-ink/50 font-mono">{fmtPct(s.mastery_avg)}</p>
+                    <p className="text-12 mt-2 text-secondary font-body">{fmtPct(s.mastery_avg)}</p>
                   </td>
                   <td className="px-12 py-12 w-32">
                     <ProgressBar value={s.completion_pct} tone="primary" />
-                    <p className="text-12 mt-2 text-ink/50 font-mono">{fmtPct(s.completion_pct)}</p>
+                    <p className="text-12 mt-2 text-secondary font-body">{fmtPct(s.completion_pct)}</p>
                   </td>
-                  <td className="px-12 py-12 font-mono text-12">
+                  <td className="px-12 py-12 font-body text-12 text-secondary">
                     <span className={cn(s.days_since_active > 7 && "text-warning")}>
                       {s.days_since_active}d
                     </span>
@@ -174,10 +174,10 @@ function Filters({ filter, setFilter }: { filter: Filter; setFilter: (f: Filter)
           type="button"
           onClick={() => setFilter(o.id)}
           className={cn(
-            "rounded-md px-12 py-6 font-mono text-12 uppercase tracking-widest",
+            "rounded-md border px-12 py-6 font-body text-12 tracking-wide",
             filter === o.id
-              ? "bg-artistic-gradient text-surface"
-              : "text-ink/60 border-2 border-ink/10 hover:border-primary",
+              ? "border-ink bg-ink text-surface"
+              : "border-line bg-surface text-secondary hover:border-ink/20",
           )}
         >
           {o.label}
@@ -208,7 +208,7 @@ function RiskBadge({ prob, band, burnout }: { prob: number; band: string; burnou
     <div className="flex items-center gap-8">
       <Badge tone={tone}>{fmtPct(prob)}</Badge>
       {burnout && (
-        <span className="inline-flex items-center gap-4 text-warning text-12 font-mono">
+        <span className="inline-flex items-center gap-4 font-body text-12 text-warning">
           <Icon name="fire" size={12} /> burnout
         </span>
       )}

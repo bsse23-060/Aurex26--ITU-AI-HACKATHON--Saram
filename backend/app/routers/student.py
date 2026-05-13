@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..ai.embeddings import embed_text, embed_texts
 from ..ai.recommender import recommend_modules
+from ..ai.roadmap import RoadmapInput, generate_roadmap
 from ..auth import get_current_user, require_student
 from ..database import get_db
 from ..models import (
@@ -323,6 +324,121 @@ def submit_answer(
         ),
         confusion_triggered=verdict.triggered,
         confusion_message=verdict.message,
+    )
+
+
+@router.post("/switch-course/{course_id}", response_model=RoadmapOut)
+def switch_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_student),
+) -> RoadmapOut:
+    """Move the student to a new course and regenerate their roadmap.
+
+    The student's Learning DNA, mastery, and weekly_hours/goal are preserved —
+    we only rebuild the *plan* and clear stale roadmap rows. The skill graph,
+    mastery heatmap, career simulator, and tutor RAG all read from
+    `user.enrolled_course_id`, so they automatically follow this switch.
+    """
+
+    course = (
+        db.query(Course)
+        .options(selectinload(Course.modules))
+        .filter(Course.id == course_id)
+        .one_or_none()
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if not course.modules:
+        raise HTTPException(status_code=400, detail="Course has no modules yet")
+
+    user.enrolled_course_id = course.id
+    db.query(RoadmapStep).filter(RoadmapStep.user_id == user.id).delete()
+
+    dna_row = db.query(LearningDNA).filter(LearningDNA.user_id == user.id).one_or_none()
+    dna_dict = dna_row.as_dict() if dna_row else {
+        "modality": 0.5,
+        "depth": 0.5,
+        "pace": 0.5,
+        "abstraction": 0.5,
+        "time_of_day": 0.5,
+    }
+
+    modules_payload = [
+        {
+            "id": m.id,
+            "title": m.title,
+            "summary": m.summary,
+            "position": m.position,
+            "estimated_minutes": m.estimated_minutes,
+        }
+        for m in sorted(course.modules, key=lambda m: m.position)
+    ]
+    plan, source = generate_roadmap(
+        RoadmapInput(
+            goal=user.goal or "Become job-ready",
+            prior_experience=user.prior_experience or "beginner",
+            weekly_hours=user.weekly_hours or 5,
+            dna=dna_dict,
+            diagnostic=[],
+            modules=modules_payload,
+        )
+    )
+
+    db.add(
+        EngagementEvent(
+            user_id=user.id,
+            kind="course_switch",
+            module_id=None,
+            payload={"course_id": course.id, "source": source},
+        )
+    )
+
+    steps_out: List[RoadmapStepOut] = []
+    for pos, step in enumerate(plan, start=1):
+        module = db.get(Module, step.module_id)
+        if not module:
+            continue
+        db.add(
+            RoadmapStep(
+                user_id=user.id,
+                module_id=module.id,
+                position=pos,
+                target_week=step.target_week,
+                rationale=step.rationale,
+                completed=False,
+            )
+        )
+        steps_out.append(
+            RoadmapStepOut(
+                position=pos,
+                module_id=module.id,
+                module_title=module.title,
+                module_summary=module.summary,
+                target_week=step.target_week,
+                rationale=step.rationale,
+                completed=False,
+                estimated_minutes=module.estimated_minutes,
+            )
+        )
+    db.commit()
+
+    rows = (
+        db.query(RoadmapStep)
+        .filter(RoadmapStep.user_id == user.id)
+        .order_by(RoadmapStep.position)
+        .all()
+    )
+    by_position = {r.position: r.id for r in rows}
+    for s in steps_out:
+        s.id = by_position.get(s.position)
+
+    return RoadmapOut(
+        course_id=course.id,
+        course_title=course.title,
+        course_color=course.color,
+        steps=steps_out,
+        generated_by=source,
     )
 
 

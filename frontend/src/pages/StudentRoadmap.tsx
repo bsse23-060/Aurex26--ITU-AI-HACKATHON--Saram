@@ -54,23 +54,23 @@ export function StudentRoadmap() {
         </p>
       </div>
 
-      <div className="relative pl-24 border-l-2 border-dashed border-secondary/40 space-y-24">
+      <div className="relative pl-24 border-l border-line space-y-24">
         {roadmap.steps.map((s, i) => (
           <motion.div
             key={s.module_id}
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.05 }}
             className="relative"
           >
             <span
               className={cn(
-                "absolute -left-[34px] top-12 flex h-16 w-16 items-center justify-center rounded-md text-12 font-display shadow-bold",
+                "absolute -left-[33px] top-12 flex h-16 w-16 items-center justify-center rounded-sm border text-12 font-body shadow-artistic",
                 s.completed
-                  ? "bg-success text-surface"
+                  ? "border-ink bg-ink text-surface"
                   : i === done
-                    ? "bg-artistic-gradient text-surface animate-pulse-ring"
-                    : "bg-surface text-ink/60 border-2 border-secondary/40",
+                    ? "border-ink/40 bg-neutral text-ink"
+                    : "border-line bg-surface text-secondary",
               )}
             >
               {s.completed ? <Icon name="check" size={12} /> : s.position}
@@ -83,9 +83,9 @@ export function StudentRoadmap() {
                     <Badge tone="ink">{s.estimated_minutes} min</Badge>
                     {s.completed && <Badge tone="success">Done</Badge>}
                   </div>
-                  <h3 className="display text-22 mb-4">{s.module_title}</h3>
-                  <p className="text-14 text-ink/70 mb-8">{s.module_summary}</p>
-                  <p className="text-12 text-secondary font-mono">{s.rationale}</p>
+                  <h3 className="display text-22 mb-4 font-normal">{s.module_title}</h3>
+                  <p className="text-14 text-secondary mb-8">{s.module_summary}</p>
+                  <p className="text-12 text-secondary font-body">{s.rationale}</p>
                 </div>
                 <div className="flex flex-col gap-8 shrink-0">
                   <Link to={`/student/module/${s.module_id}`}>

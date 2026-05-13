@@ -10,12 +10,11 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const styles: Record<Variant, string> = {
-  primary:
-    "text-surface bg-artistic-gradient shadow-bold hover:shadow-[0_12px_40px_rgba(59,130,246,0.35)] active:scale-[0.99]",
-  ghost: "text-ink/80 border-2 border-ink/10 hover:border-primary hover:text-primary",
-  danger: "text-surface bg-danger hover:bg-[#b91c1c]",
-  soft: "text-secondary bg-secondary/10 hover:bg-secondary/20",
-  outline: "text-primary border-2 border-primary hover:bg-primary hover:text-surface",
+  primary: "text-surface bg-primary border-primary hover:bg-primary/90",
+  ghost: "text-ink/90 border-line bg-surface hover:bg-aqua-soft hover:border-primary/30",
+  danger: "text-surface bg-danger border-danger hover:opacity-90",
+  soft: "text-ink border-line bg-mint/60 hover:bg-mint-strong/80",
+  outline: "text-primary border-primary/40 bg-surface hover:bg-aqua-soft hover:border-primary",
 };
 
 export function Button({
@@ -32,7 +31,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-8 rounded-md px-16 py-12 font-mono text-12 uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-8 rounded-md border px-16 py-12 font-body text-14 transition-opacity disabled:opacity-45 disabled:cursor-not-allowed",
         styles[variant],
         className,
       )}

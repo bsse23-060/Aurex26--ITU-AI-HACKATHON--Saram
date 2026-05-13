@@ -68,7 +68,7 @@ export function StudentCareer() {
                         {r.skill_gaps.map((g) => (
                           <span
                             key={g.concept_slug}
-                            className="inline-flex items-center gap-8 rounded-md bg-warning/10 text-warning px-12 py-4 font-mono text-12"
+                            className="inline-flex items-center gap-8 rounded-md border border-line bg-neutral px-12 py-4 font-body text-12 text-warning"
                           >
                             <span>{g.concept_name}</span>
                             <span className="opacity-70">
