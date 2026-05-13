@@ -1034,14 +1034,69 @@ function dnaPanel(dna) {
         })
         .join("")}
     </div>
-    <div class="twin-card">
-      <div class="avatar">${initials(state.twin?.twin_name)}</div>
+  `;
+}
+
+function twinFeaturePanel() {
+  const twin = state.twin || fallbackTwin;
+  const strengths = twin.shared_strengths?.length ? twin.shared_strengths : ["consistent practice", "visual learning"];
+
+  return `
+    <div class="twin-hero-card">
+      <div class="avatar twin-avatar">${initials(twin.twin_name)}</div>
       <div>
-        <span>Peer twin</span>
-        <strong>${html(state.twin?.twin_name || "Matched learner")}</strong>
-        <p>${html(state.twin?.note || "")}</p>
+        <span>Your closest successful path</span>
+        <strong>${html(twin.twin_name || "Matched learner")}</strong>
+        <p>${html(twin.note || "This learner has a similar Learning DNA and is ahead on the same path.")}</p>
       </div>
     </div>
+    <div class="twin-stats">
+      <div>
+        <span>Similarity</span>
+        <strong>${pct(twin.similarity || 0)}</strong>
+      </div>
+      <div>
+        <span>Modules ahead</span>
+        <strong>${html(twin.modules_ahead || 0)}</strong>
+      </div>
+      <div>
+        <span>Next move</span>
+        <strong>${html((state.roadmap?.steps || []).find((step) => !step.completed)?.module_title || "Adaptive quiz")}</strong>
+      </div>
+    </div>
+    <div class="strength-chip-row">
+      ${strengths.map((strength) => `<span>${html(strength)}</span>`).join("")}
+    </div>
+    <button class="command-button twin-action" data-action="ask-twin" type="button">
+      ${icon("spark")} Ask Gemini for my twin-based study plan
+    </button>
+  `;
+}
+
+function voiceAssistantPanel() {
+  const prompt = state.voiceListening
+    ? "Listening now. Ask your question out loud."
+    : state.voiceTranscript
+      ? `Heard: "${state.voiceTranscript}"`
+      : "Click the mic, ask your question, and the tutor will answer with Gemini then speak through ElevenLabs.";
+
+  return `
+    <div class="voice-assistant-card">
+      <button class="voice-orb ${state.voiceListening ? "listening" : ""}" data-action="voice-listen" type="button" ${state.voiceEnabled ? "" : "disabled"}>
+        ${icon("mic")}
+      </button>
+      <div>
+        <strong>${state.voiceListening ? "Listening..." : state.speaking ? "Speaking..." : "Voice assistant ready"}</strong>
+        <p>${html(prompt)}</p>
+        ${state.voiceError ? `<em>${html(state.voiceError)}</em>` : ""}
+      </div>
+    </div>
+    <form class="speak-form" data-form="speak-text">
+      <input name="speakText" type="text" placeholder="Type any text for ElevenLabs to speak" autocomplete="off" />
+      <button class="command-button" type="submit" ${state.voiceEnabled ? "" : "disabled"}>
+        ${icon("volume")} Speak text
+      </button>
+    </form>
   `;
 }
 
@@ -1073,8 +1128,11 @@ function tutorPanel() {
   return `
     <div class="tutor-tools">
       <span class="pill">${state.providers.gemini ? "Gemini answers" : "Gemini key missing"}</span>
+      <button class="command-button ghost" data-action="voice-listen" type="button" ${state.voiceEnabled ? "" : "disabled"}>
+        ${icon("mic")} ${state.voiceListening ? "Listening..." : "Ask by voice"}
+      </button>
       <button class="command-button ghost" data-action="speak" type="button" ${state.voiceEnabled ? "" : "disabled"}>
-        ${icon("play")} ${state.speaking ? "Speaking..." : "Speak latest"}
+        ${icon("volume")} ${state.speaking ? "Speaking..." : "Speak latest"}
       </button>
     </div>
     <div class="chat-log">
@@ -1433,6 +1491,12 @@ document.addEventListener("click", (event) => {
   if (action === "speak") {
     speakLatestAssistant();
   }
+  if (action === "voice-listen") {
+    startVoiceAssistant();
+  }
+  if (action === "ask-twin") {
+    askTwinCoach();
+  }
   if (action === "followup") {
     askTutor(actionEl.dataset.message || "");
   }
@@ -1441,6 +1505,7 @@ document.addEventListener("click", (event) => {
 document.addEventListener("submit", (event) => {
   const form = event.target.closest("[data-form='tutor']");
   const goalForm = event.target.closest("[data-form='goal']");
+  const speakForm = event.target.closest("[data-form='speak-text']");
 
   if (form) {
     event.preventDefault();
@@ -1453,6 +1518,11 @@ document.addEventListener("submit", (event) => {
   if (goalForm) {
     event.preventDefault();
     updateLearningGoal(goalForm);
+  }
+
+  if (speakForm) {
+    event.preventDefault();
+    speakTypedText(speakForm);
   }
 });
 
