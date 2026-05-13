@@ -19,7 +19,10 @@ const studentNav: Item[] = [
 
 const instructorNav: Item[] = [{ to: "/instructor", label: "Cohort", icon: "dashboard" }];
 
-const adminNav: Item[] = [{ to: "/admin", label: "Analytics", icon: "shield" }];
+const adminNav: Item[] = [
+  { to: "/admin", label: "Analytics", icon: "shield" },
+  { to: "/admin/courses", label: "Courses", icon: "book" },
+];
 
 function navFor(role: string): Item[] {
   if (role === "admin") return adminNav;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   endpoints,
   type Career,
+  type Course as CourseType,
   type DNAVector,
   type MasteryRow,
   type PeerTwin,
@@ -17,48 +18,86 @@ import { Badge } from "../components/ui/Badge";
 import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Icon } from "../components/ui/Icon";
+import { useToast } from "../components/ui/Toaster";
 import { cn, fmtPct } from "../lib/cn";
 
-const DIM_LABEL: Record<keyof DNAVector, { label: string; lo: string; hi: string }> = {
-  modality: { label: "Modality", lo: "Reading", hi: "Visual" },
-  depth: { label: "Depth", lo: "Breadth", hi: "Depth" },
-  pace: { label: "Pace", lo: "Sprints", hi: "Marathons" },
-  abstraction: { label: "Abstraction", lo: "Concrete", hi: "Theory" },
-  time_of_day: { label: "Peak time", lo: "Morning", hi: "Late night" },
+const DIM_LABEL: Record<
+  keyof DNAVector,
+  { label: string; axis: string; lo: string; hi: string }
+> = {
+  modality: { label: "Modality", axis: "MODALITY", lo: "Reading", hi: "Visual" },
+  depth: { label: "Depth", axis: "DEPTH", lo: "Breadth", hi: "Depth" },
+  pace: { label: "Pace", axis: "PACE", lo: "Sprints", hi: "Marathons" },
+  abstraction: { label: "Abstraction", axis: "ABSTRACT", lo: "Concrete", hi: "Theory" },
+  /** Short axis label avoids clipping at the top of the radar (was "PEAK TIME"). */
+  time_of_day: { label: "Peak time", axis: "RHYTHM", lo: "Morning", hi: "Late night" },
 };
 
 export function StudentHome() {
   const token = useAuth((s) => s.token)!;
   const user = useAuth((s) => s.user)!;
+  const refreshUser = useAuth((s) => s.refreshUser);
+  const toast = useToast();
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
   const [dna, setDna] = useState<DNAVector | null>(null);
   const [mastery, setMastery] = useState<MasteryRow[]>([]);
   const [career, setCareer] = useState<Career | null>(null);
   const [twin, setTwin] = useState<PeerTwin>(null);
+  const [courses, setCourses] = useState<CourseType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [switchingId, setSwitchingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    let ok = true;
+  const loadAll = useCallback(() => {
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       endpoints.roadmap(token).catch(() => null),
       endpoints.dna(token).catch(() => null),
       endpoints.mastery(token).catch(() => [] as MasteryRow[]),
       endpoints.career(token).catch(() => null),
       endpoints.twin(token).catch(() => null),
-    ]).then(([r, d, m, c, t]) => {
-      if (!ok) return;
+      endpoints.courses(token).catch(() => [] as CourseType[]),
+    ]).then(([r, d, m, c, t, cs]) => {
       setRoadmap(r);
       setDna(d);
       setMastery(m);
       setCareer(c);
       setTwin(t);
+      setCourses(cs);
       setLoading(false);
     });
-    return () => {
-      ok = false;
-    };
   }, [token]);
+
+  useEffect(() => {
+    let active = true;
+    loadAll().then(() => {
+      if (!active) return;
+    });
+    return () => {
+      active = false;
+    };
+  }, [loadAll]);
+
+  const handleSwitchCourse = useCallback(
+    async (courseId: number, title: string) => {
+      if (switchingId !== null) return;
+      setSwitchingId(courseId);
+      try {
+        const next = await endpoints.switchCourse(courseId, token);
+        await refreshUser();
+        await loadAll();
+        toast.success(
+          `Roadmap rebuilt for ${title} (${next.generated_by === "gemini" ? "Gemini-tailored" : "rule-based"}).`,
+          "Track switched",
+        );
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "Could not switch tracks.";
+        toast.fail(detail, "Track switch failed");
+      } finally {
+        setSwitchingId(null);
+      }
+    },
+    [loadAll, refreshUser, switchingId, toast, token],
+  );
 
   const completion = roadmap
     ? roadmap.steps.filter((s) => s.completed).length / Math.max(1, roadmap.steps.length)
@@ -68,6 +107,17 @@ export function StudentHome() {
       ? mastery.reduce((a, b) => a + b.p_mastery, 0) / mastery.length
       : 0;
   const nextStep = roadmap?.steps.find((s) => !s.completed) ?? null;
+
+  const activeCourseId = user.enrolled_course_id ?? roadmap?.course_id ?? null;
+  const sortedCourses = useMemo(
+    () =>
+      [...courses].sort((a, b) => {
+        if (a.id === activeCourseId) return -1;
+        if (b.id === activeCourseId) return 1;
+        return a.title.localeCompare(b.title);
+      }),
+    [courses, activeCourseId],
+  );
 
   return (
     <div className="space-y-24">
@@ -80,6 +130,37 @@ export function StudentHome() {
         nextTitle={nextStep?.module_title}
         nextId={nextStep?.module_id}
       />
+
+      <Card accent="primary">
+        <div className="mb-12 flex flex-wrap items-baseline justify-between gap-8">
+          <CardTitle kicker="Tracks">Your atomcamp courses</CardTitle>
+          <p className="font-body text-12 text-secondary">
+            Switch tracks anytime — your DNA and mastery follow you, the roadmap rebuilds.
+          </p>
+        </div>
+        {loading && courses.length === 0 ? (
+          <div className="grid gap-12 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[140px]" />
+            ))}
+          </div>
+        ) : courses.length === 0 ? (
+          <p className="text-ink/60">No courses available yet — ask an admin to add one.</p>
+        ) : (
+          <div className="grid gap-12 md:grid-cols-2 xl:grid-cols-3">
+            {sortedCourses.map((c) => (
+              <CourseCard
+                key={c.id}
+                course={c}
+                active={c.id === activeCourseId}
+                switching={switchingId === c.id}
+                disabled={switchingId !== null && switchingId !== c.id}
+                onSelect={() => handleSwitchCourse(c.id, c.title)}
+              />
+            ))}
+          </div>
+        )}
+      </Card>
 
       <div className="grid gap-24 lg:grid-cols-3">
         <Card accent="primary" className="lg:col-span-2">
@@ -282,9 +363,11 @@ function Stat({ label, value, loading }: { label: string; value: string; loading
 
 function DnaRadar({ dna }: { dna: DNAVector }) {
   const dims = Object.keys(DIM_LABEL) as (keyof DNAVector)[];
-  const cx = 110;
-  const cy = 110;
-  const r = 85;
+  const vb = 260;
+  const cx = vb / 2;
+  const cy = vb / 2;
+  const r = 78;
+  const labelR = r + 26;
   const points = dims.map((d, i) => {
     const a = (Math.PI * 2 * i) / dims.length - Math.PI / 2;
     const v = dna[d];
@@ -292,13 +375,25 @@ function DnaRadar({ dna }: { dna: DNAVector }) {
   });
   const labelPts = dims.map((d, i) => {
     const a = (Math.PI * 2 * i) / dims.length - Math.PI / 2;
-    return { x: cx + Math.cos(a) * (r + 18), y: cy + Math.sin(a) * (r + 18), d };
+    return { x: cx + Math.cos(a) * labelR, y: cy + Math.sin(a) * labelR, d };
   });
   return (
-    <div className="flex items-center gap-16">
-      <svg viewBox="0 0 220 220" className="h-[220px] w-[220px] shrink-0">
+    <div className="flex w-full min-w-0 flex-col gap-16">
+      <svg
+        viewBox={`0 0 ${vb} ${vb}`}
+        className="mx-auto h-[200px] w-[200px] shrink-0"
+        aria-hidden
+      >
         {[0.25, 0.5, 0.75, 1].map((s) => (
-          <circle key={s} cx={cx} cy={cy} r={r * s} fill="none" stroke="rgba(17,24,39,0.08)" />
+          <circle
+            key={s}
+            cx={cx}
+            cy={cy}
+            r={r * s}
+            fill="none"
+            stroke="rgba(15,118,110,0.14)"
+            strokeWidth={1}
+          />
         ))}
         {dims.map((_, i) => {
           const a = (Math.PI * 2 * i) / dims.length - Math.PI / 2;
@@ -309,19 +404,20 @@ function DnaRadar({ dna }: { dna: DNAVector }) {
               y1={cy}
               x2={cx + Math.cos(a) * r}
               y2={cy + Math.sin(a) * r}
-              stroke="rgba(17,24,39,0.06)"
+              stroke="rgba(15,118,110,0.12)"
+              strokeWidth={1}
             />
           );
         })}
         <polygon
           points={points.map(([x, y]) => `${x},${y}`).join(" ")}
           fill="url(#dnaGrad)"
-          fillOpacity="0.35"
-          stroke="#525252"
-          strokeWidth="1.5"
+          fillOpacity={0.45}
+          stroke="#0f766e"
+          strokeWidth={1.5}
         />
         {points.map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={3.5} fill="#404040" />
+          <circle key={i} cx={x} cy={y} r={4} fill="#0f766e" stroke="#fff" strokeWidth={1} />
         ))}
         {labelPts.map(({ x, y, d }) => (
           <text
@@ -329,30 +425,43 @@ function DnaRadar({ dna }: { dna: DNAVector }) {
             x={x}
             y={y}
             textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize="9"
+            dominantBaseline="central"
+            fontSize={8.5}
+            letterSpacing="0.08em"
             fontFamily="Times New Roman, Times, serif"
-            fill="rgba(38,38,38,0.7)"
+            fill="rgb(15,118,110)"
+            fontWeight={600}
           >
-            {DIM_LABEL[d].label.toUpperCase()}
+            {DIM_LABEL[d].axis}
           </text>
         ))}
         <defs>
-          <linearGradient id="dnaGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#d4d4d4" />
-            <stop offset="100%" stopColor="#a3a3a3" />
+          <linearGradient id="dnaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ccfbf1" />
+            <stop offset="55%" stopColor="#99f6e4" />
+            <stop offset="100%" stopColor="#a7f3d0" />
           </linearGradient>
         </defs>
       </svg>
-      <ul className="space-y-4 text-12 font-body">
+      <ul className="w-full min-w-0 font-body">
         {dims.map((d) => (
-          <li key={d} className="flex items-center gap-8">
-            <span className="inline-block h-2 w-2 rounded-full bg-line ring-1 ring-ink/10" />
-            <span className="w-24 text-ink/75">{DIM_LABEL[d].label}</span>
-            <span className="text-secondary">
-              {DIM_LABEL[d].lo} → {DIM_LABEL[d].hi}
+          <li
+            key={d}
+            className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-12 border-b border-line py-8 first:pt-0 last:border-b-0"
+          >
+            <span
+              className="h-8 w-8 shrink-0 rounded-full border border-primary/30 bg-aqua-soft"
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <p className="text-14 font-medium leading-snug text-ink">{DIM_LABEL[d].label}</p>
+              <p className="mt-2 text-12 leading-snug text-secondary">
+                {DIM_LABEL[d].lo} → {DIM_LABEL[d].hi}
+              </p>
+            </div>
+            <span className="text-14 tabular-nums font-medium leading-snug text-primary whitespace-nowrap">
+              {fmtPct(dna[d])}
             </span>
-            <span className="ml-auto text-ink font-medium">{fmtPct(dna[d])}</span>
           </li>
         ))}
       </ul>
@@ -423,4 +532,65 @@ function heatColor(p: number): string {
   const t = Math.max(0, Math.min(1, p));
   const a = 0.18 + t * 0.42;
   return `rgba(64, 64, 64, ${a})`;
+}
+
+function CourseCard({
+  course,
+  active,
+  switching,
+  disabled,
+  onSelect,
+}: {
+  course: CourseType;
+  active: boolean;
+  switching: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const moduleCount = course.modules?.length ?? 0;
+  return (
+    <div
+      className={cn(
+        "flex h-full flex-col rounded-md border p-16 transition-colors",
+        active
+          ? "border-primary bg-aqua-soft/60 shadow-bold"
+          : "border-line bg-surface hover:border-primary/40 hover:bg-aqua-soft/35",
+      )}
+    >
+      <div className="flex items-start justify-between gap-8">
+        <div className="min-w-0">
+          <p className="display text-18 leading-tight text-ink">{course.title}</p>
+          <p className="font-body text-12 text-secondary mt-2">{course.tagline}</p>
+        </div>
+        <span
+          className="inline-block h-12 w-12 shrink-0 rounded-sm border border-line"
+          style={{ background: course.color || "#0F766E" }}
+          aria-hidden
+        />
+      </div>
+      <p className="font-body text-12 text-ink/60 mt-8 leading-relaxed line-clamp-3">
+        {course.description}
+      </p>
+      <div className="mt-auto flex items-center justify-between gap-8 pt-12">
+        <span className="font-body text-11 uppercase tracking-[0.1em] text-ink/45">
+          {moduleCount} {moduleCount === 1 ? "module" : "modules"}
+        </span>
+        {active ? (
+          <Badge tone="success">Active track</Badge>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSelect}
+            loading={switching}
+            disabled={disabled || switching}
+            icon={<Icon name="arrow-right" size={14} />}
+            className="!py-6 !px-12 text-12"
+          >
+            Switch
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }

@@ -333,6 +333,55 @@ export type AdminAnalytics = {
   funnel: { label: string; count: number }[];
 };
 
+export type AdminCourseSummary = {
+  id: number;
+  slug: string;
+  title: string;
+  tagline: string;
+  color: string;
+  icon: string;
+  instructor_id: number | null;
+  module_count: number;
+  concept_count: number;
+};
+
+export type ModuleInput = {
+  slug?: string;
+  title: string;
+  summary: string;
+  content_md?: string;
+  estimated_minutes?: number;
+  concepts?: { slug?: string; name: string; description?: string }[];
+};
+
+export type CourseInput = {
+  slug?: string;
+  title: string;
+  tagline: string;
+  description: string;
+  color?: string;
+  icon?: string;
+  instructor_id?: number | null;
+  modules?: ModuleInput[];
+};
+
+export type CoursePatch = Partial<{
+  title: string;
+  tagline: string;
+  description: string;
+  color: string;
+  icon: string;
+  instructor_id: number | null;
+}>;
+
+export type ModulePatch = Partial<{
+  title: string;
+  summary: string;
+  content_md: string;
+  estimated_minutes: number;
+  position: number;
+}>;
+
 export const endpoints = {
   demoAccounts: () =>
     api<{
@@ -424,4 +473,38 @@ export const endpoints = {
     api<StudentDetail>(`/api/instructor/students/${id}`, { token }),
   adminAnalytics: (token: string) =>
     api<AdminAnalytics>("/api/admin/analytics", { token }),
+  switchCourse: (courseId: number, token: string) =>
+    api<Roadmap>(`/api/student/switch-course/${courseId}`, { method: "POST", token }),
+  adminCourses: (token: string) =>
+    api<AdminCourseSummary[]>("/api/admin/courses", { token }),
+  adminCourse: (courseId: number, token: string) =>
+    api<Course>(`/api/admin/courses/${courseId}`, { token }),
+  adminCreateCourse: (payload: CourseInput, token: string) =>
+    api<Course>("/api/admin/courses", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      token,
+    }),
+  adminUpdateCourse: (courseId: number, payload: CoursePatch, token: string) =>
+    api<Course>(`/api/admin/courses/${courseId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      token,
+    }),
+  adminDeleteCourse: (courseId: number, token: string) =>
+    api<void>(`/api/admin/courses/${courseId}`, { method: "DELETE", token }),
+  adminAddModule: (courseId: number, payload: ModuleInput, token: string) =>
+    api<ModuleSummary>(`/api/admin/courses/${courseId}/modules`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      token,
+    }),
+  adminUpdateModule: (moduleId: number, payload: ModulePatch, token: string) =>
+    api<ModuleSummary>(`/api/admin/courses/modules/${moduleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      token,
+    }),
+  adminDeleteModule: (moduleId: number, token: string) =>
+    api<void>(`/api/admin/courses/modules/${moduleId}`, { method: "DELETE", token }),
 };

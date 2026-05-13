@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { endpoints, type AdminAnalytics } from "../lib/api";
 import { useAuth } from "../lib/authStore";
 import { Card, CardTitle } from "../components/ui/Card";
 import { Skeleton } from "../components/ui/Skeleton";
 import { ProgressBar } from "../components/ui/ProgressBar";
+import { Button } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
 import { fmtPct } from "../lib/cn";
 
 export function AdminHome() {
@@ -24,10 +27,19 @@ export function AdminHome() {
 
   return (
     <div className="space-y-24">
-      <div>
-        <p className="label-caps text-secondary">Platform analytics</p>
-        <h1 className="display text-36">atomcamp · health</h1>
-        <p className="text-ink/60 mt-4">A live cross-section of every track, learner and signal.</p>
+      <div className="flex flex-wrap items-end justify-between gap-12">
+        <div>
+          <p className="label-caps text-secondary">Platform analytics</p>
+          <h1 className="display text-36">atomcamp · health</h1>
+          <p className="text-ink/60 mt-4">
+            A live cross-section of every track, learner and signal.
+          </p>
+        </div>
+        <Link to="/admin/courses">
+          <Button variant="outline" icon={<Icon name="book" size={14} />}>
+            Manage courses
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-16 md:grid-cols-4">
