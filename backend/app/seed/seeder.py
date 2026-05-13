@@ -267,7 +267,7 @@ def _simulate_history(db: Session, students: List[User], course_map: Dict[str, C
 
     for user in students:
         bp = blueprint_lookup.get(user.email)
-        profile = bp[6] if bp else "average"
+        profile = bp[5] if bp and len(bp) > 5 else "average"
         correctness = _profile_correctness(profile)
         weekly = user.weekly_hours or 4
 
