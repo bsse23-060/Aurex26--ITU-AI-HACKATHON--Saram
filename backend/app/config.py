@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"

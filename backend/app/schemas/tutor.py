@@ -24,6 +24,7 @@ class TutorResponse(BaseModel):
     language: str
     citations: List[TutorCitation]
     suggested_followups: List[str] = []
+    provider: str = "offline"
 
 
 class TutorMessageOut(BaseModel):

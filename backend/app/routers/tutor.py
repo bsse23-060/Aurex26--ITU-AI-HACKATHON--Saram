@@ -75,6 +75,7 @@ def ask(
         language=result.language,
         citations=[TutorCitation(**c) for c in result.citations],
         suggested_followups=result.suggested_followups,
+        provider=result.provider,
     )
 
 

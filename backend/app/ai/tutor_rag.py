@@ -168,20 +168,35 @@ class TutorAnswer:
     language: str
     citations: List[dict]
     suggested_followups: List[str]
+    provider: str = "offline"
 
 
 _SYSTEM_BASE = """
-You are atomcamp's friendly, encouraging AI tutor for learners in Pakistan.
+You are atomcamp's friendly, encouraging AI tutor and course advisor for learners in Pakistan.
 
 Hard rules:
-- Ground every claim in the provided context. If the context does not cover the
-  question, say so honestly and suggest where the learner can find the answer.
+- For atomcamp courses, learner progress, quizzes, goals, career readiness, and platform questions,
+  ground your answer in the provided context when possible.
+- For general questions not covered by the context, answer helpfully using your general knowledge,
+  and clearly separate general guidance from atomcamp-specific guidance.
 - Inline citations look like [#1], [#2] referring to the numbered context blocks.
 - Keep replies under ~180 words unless the learner asks for depth.
 - Be warm, never condescending. Celebrate effort.
+- Mention the next concrete learning action when the learner appears stuck.
 
 After your reply, always include exactly THREE follow-up question suggestions
 prefixed with "FOLLOWUPS:" on a new line, separated by " | ".
+""".strip()
+
+_ATOMCAMP_COURSE_CONTEXT = """
+atomcamp course offering context:
+- AI Bootcamp: for engineers and early-career builders who want Python, machine learning, generative AI, applied AI projects, and portfolio readiness.
+- Data Analytics Bootcamp: for learners moving into analytics roles through Excel, SQL, Power BI, dashboards, and decision storytelling.
+- Automation with AI: for professionals and teams who want to automate repetitive work and productivity workflows with modern AI tools.
+- Agentic AI Bootcamp: for learners who already know the basics and want agents, RAG, tool use, workflow orchestration, and evaluation.
+- AI for Teens: an introductory, safe, creative AI program for younger learners.
+- Python Summer Coding Camp: a beginner-friendly programming track focused on Python, logic, problem solving, and mini apps.
+Homepage signals: 80% job placement, 45% women participation, 70 corporate clients, 10,000 people trained in bootcamps, and 200+ soft skills trainings.
 """.strip()
 
 
@@ -214,15 +229,59 @@ def _parse_followups(text: str) -> tuple[str, List[str]]:
 
 def _stub_answer(query: str, language: str, chunks: List[RetrievedChunk]) -> str:
     if not chunks:
+        lower = query.lower()
+        if any(term in lower for term in ("course", "bootcamp", "atomcamp", "ai engineering", "data analytics", "agent")):
+            return (
+                "For AI engineering, start with atomcamp's AI Bootcamp if you want the broad path: Python, "
+                "machine learning, generative AI, and portfolio work. If your goal is dashboards and business "
+                "decisions, choose Data Analytics Bootcamp. If you already know the basics and want workflow "
+                "automation, Automation with AI or Agentic AI Bootcamp is the sharper fit. Next action: set your "
+                "goal and weekly hours, then generate a roadmap so quizzes, feedback, and career readiness stay tied together."
+            )
+        if any(term in lower for term in ("hello", "hi", "help", "stuck", "explain", "what is", "how do")):
+            return (
+                "I can help with atomcamp course choices, quiz feedback, career planning, and general learning questions. "
+                "Ask me the exact thing you're stuck on, and I'll give a short explanation plus the next practice step. "
+                "Live Gemini is not configured yet, so this is the local fallback response."
+            )
         return (
-            "I couldn't find this in the indexed course material yet. Try opening a module "
-            "first or rephrasing the question."
+            "I can answer that once Gemini is configured. For now, I can still help with atomcamp course selection, "
+            "roadmap planning, quizzes, progress feedback, and career outcomes from the local LMS data."
         )
     bullets = "\n".join(f"[#{i + 1}] {c.text[:180]}..." for i, c in enumerate(chunks[:3]))
     return (
         "Here's what the course material says about your question:\n\n"
         f"{bullets}\n\n(Live LLM is offline; showing top retrieved passages.)"
     )
+
+
+def _gemini_answer(query: str, language: str, chunks: List[RetrievedChunk]) -> Optional[tuple[str, List[str]]]:
+    if not settings.has_gemini:
+        return None
+    try:
+        import google.generativeai as genai
+
+        retrieved_context = (
+            "\n\n".join(
+                f"[#{i + 1}] (module: {c.metadata.get('module_title', '?')}; "
+                f"concept: {c.metadata.get('concept_name', '?')})\n{c.text}"
+                for i, c in enumerate(chunks)
+            )
+            or "(no atomcamp course context retrieved for this query)"
+        )
+        context_block = f"{_ATOMCAMP_COURSE_CONTEXT}\n\nRetrieved LMS context:\n{retrieved_context}"
+        language_rules = system_language_instruction(language)
+        genai.configure(api_key=settings.gemini_api_key)
+        model = genai.GenerativeModel(settings.gemini_model)
+        prompt = f"{_SYSTEM_BASE}\n\nLANGUAGE RULES:\n{language_rules}\n\nCONTEXT:\n{context_block}\n\nLEARNER QUESTION:\n{query}"
+        response = model.generate_content(prompt)
+        raw = getattr(response, "text", "") or ""
+        if not raw.strip():
+            return None
+        return _parse_followups(raw)
+    except Exception as exc:  # noqa: BLE001 - provider failure should not break the UI
+        _log.warning("Gemini tutor failed, trying next provider: %s", exc)
+        return None
 
 
 def answer(
@@ -244,8 +303,29 @@ def answer(
     ]
 
     if not settings.has_groq:
+        gemini = _gemini_answer(query, language, chunks)
+        if gemini:
+            reply, followups = gemini
+            return TutorAnswer(
+                reply=reply,
+                language=language,
+                citations=citations,
+                suggested_followups=followups,
+                provider="gemini",
+            )
         reply = _stub_answer(query, language, chunks)
-        return TutorAnswer(reply=reply, language=language, citations=citations, suggested_followups=[])
+        return TutorAnswer(reply=reply, language=language, citations=citations, suggested_followups=[], provider="offline")
+
+    gemini = _gemini_answer(query, language, chunks)
+    if gemini:
+        reply, followups = gemini
+        return TutorAnswer(
+            reply=reply,
+            language=language,
+            citations=citations,
+            suggested_followups=followups,
+            provider="gemini",
+        )
 
     try:
         from groq import Groq
@@ -265,8 +345,9 @@ def answer(
             language=language,
             citations=citations,
             suggested_followups=followups,
+            provider="groq",
         )
     except Exception as exc:  # noqa: BLE001
         _log.warning("Groq tutor failed, falling back to retrieval stub: %s", exc)
         reply = _stub_answer(query, language, chunks)
-        return TutorAnswer(reply=reply, language=language, citations=citations, suggested_followups=[])
+        return TutorAnswer(reply=reply, language=language, citations=citations, suggested_followups=[], provider="offline")
