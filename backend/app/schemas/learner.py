@@ -38,6 +38,7 @@ class MasteryOut(BaseModel):
 
 
 class RoadmapStepOut(BaseModel):
+    id: Optional[int] = None
     position: int
     module_id: int
     module_title: str
