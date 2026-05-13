@@ -422,7 +422,11 @@ async function speakText(text) {
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const blob = await response.blob();
     currentVoiceAudio = new Audio(URL.createObjectURL(blob));
-    await currentVoiceAudio.play();
+    await new Promise((resolve, reject) => {
+      currentVoiceAudio.onended = resolve;
+      currentVoiceAudio.onerror = () => reject(new Error("audio playback failed"));
+      currentVoiceAudio.play().catch(reject);
+    });
   } catch (error) {
     state.voiceError = `ElevenLabs voice unavailable: ${error.message}`;
   } finally {
