@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from .bootstrap import startup
 from .config import settings
@@ -46,6 +47,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    """Backend API only — the React app runs on port 5173. This page avoids a bare 404 on :8000/."""
+
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>atomcamp Smart LMS — API</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #1e1b4b; }
+    a { color: #7c3aed; }
+    code { background: #f5f3ff; padding: 0.15rem 0.4rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>atomcamp Smart LMS</h1>
+  <p>This is the <strong>FastAPI backend</strong>. There is no SPA here — open the <strong>Vite frontend</strong> at
+     <code>http://localhost:5173</code> (or whatever port you configured).</p>
+  <ul>
+    <li><a href="/docs">Swagger UI</a> — try <code>POST /api/auth/login</code> with demo accounts from <code>GET /api/auth/demo-accounts</code></li>
+    <li><a href="/redoc">ReDoc</a></li>
+    <li><a href="/api/health">GET /api/health</a></li>
+  </ul>
+  <p><small>Console noise from browser extensions (e.g. NinjaHumanizer) is unrelated to this app.</small></p>
+</body>
+</html>"""
 
 
 @app.get("/api/health")
