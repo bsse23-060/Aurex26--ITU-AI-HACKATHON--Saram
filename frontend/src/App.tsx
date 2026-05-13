@@ -15,10 +15,12 @@ import { ModulePage } from "./pages/ModulePage";
 import { InstructorHome } from "./pages/InstructorHome";
 import { InstructorStudent } from "./pages/InstructorStudent";
 import { AdminHome } from "./pages/AdminHome";
+import { LandingPage } from "./pages/LandingPage";
 
-function RoleRedirect() {
+function HomeGate() {
   const user = useAuth((s) => s.user);
-  if (!user) return <Navigate to="/login" replace />;
+  const token = useAuth((s) => s.token);
+  if (!token || !user) return <LandingPage />;
   if (user.role === "admin") return <Navigate to="/admin" replace />;
   if (user.role === "instructor") return <Navigate to="/instructor" replace />;
   if (!user.enrolled_course_id) return <Navigate to="/onboarding" replace />;
@@ -35,7 +37,7 @@ function Guard({
   const { user, token } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (!token || !user) navigate("/login", { replace: true });
+    if (!token || !user) navigate("/", { replace: true });
     else if (!roles.includes(user.role)) navigate("/", { replace: true });
   }, [token, user, navigate, roles]);
   if (!token || !user || !roles.includes(user.role)) return null;
@@ -52,7 +54,7 @@ export default function App() {
   return (
     <ToastProvider>
       <Routes>
-        <Route path="/" element={<RoleRedirect />} />
+        <Route path="/" element={<HomeGate />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/onboarding"

@@ -393,7 +393,31 @@ export const endpoints = {
     }),
   tutorHistory: (limit: number, token: string) =>
     api<TutorMessage[]>(`/api/tutor/history?limit=${limit}`, { token }),
-  voiceStatus: () => api<{ enabled: boolean }>("/api/tutor/voice/status"),
+  voiceStatus: () =>
+    api<{
+      enabled: boolean;
+      tts_enabled: boolean;
+      stt_enabled: boolean;
+      voice_id: string | null;
+      stt_model: string | null;
+      stt_languages: string[];
+    }>("/api/tutor/voice/status"),
+  voiceTranscribe: (blob: Blob, language: "auto" | "en" | "ur", token: string) => {
+    const form = new FormData();
+    const ext = (blob.type.split("/")[1] || "webm").split(";")[0];
+    form.append("audio", blob, `clip.${ext}`);
+    form.append("language", language);
+    return api<{
+      text: string;
+      language: string;
+      duration_s: number | null;
+      model: string;
+    }>("/api/tutor/voice/stt", {
+      method: "POST",
+      body: form,
+      token,
+    });
+  },
   instructorDashboard: (token: string) =>
     api<InstructorDashboard>("/api/instructor/dashboard", { token }),
   studentDetail: (id: number, token: string) =>

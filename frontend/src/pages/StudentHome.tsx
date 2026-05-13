@@ -92,12 +92,12 @@ export function StudentHome() {
                 <li key={s.module_id} className="flex items-start gap-12">
                   <span
                     className={cn(
-                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-md font-display text-14",
+                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-line font-body text-14",
                       s.completed
-                        ? "bg-success text-surface"
+                        ? "bg-ink text-surface border-ink"
                         : i === 0
-                          ? "bg-artistic-gradient text-surface"
-                          : "bg-ink/10 text-ink/60",
+                          ? "bg-neutral text-ink border-ink/30"
+                          : "bg-surface text-secondary",
                     )}
                   >
                     {s.completed ? <Icon name="check" size={14} /> : s.position}
@@ -105,7 +105,7 @@ export function StudentHome() {
                   <div className="flex-1">
                     <Link
                       to={`/student/module/${s.module_id}`}
-                      className="display text-18 hover:text-primary"
+                      className="display text-18 text-ink hover:underline"
                     >
                       {s.module_title}
                     </Link>
@@ -198,11 +198,11 @@ export function StudentHome() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="display text-30 text-primary">
+                <p className="display text-30 text-ink">
                   {fmtPct(twin.similarity)}
                 </p>
                 <p className="label-caps text-ink/50">similarity</p>
-                <p className="text-12 mt-4 font-mono text-secondary">
+                <p className="text-12 mt-4 font-body text-secondary">
                   +{twin.modules_ahead} modules ahead
                 </p>
               </div>
@@ -242,20 +242,21 @@ function Hero({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-xl border-2 border-ink/5 bg-artistic-gradient text-surface p-32 shadow-bold"
+      className="relative overflow-hidden rounded-lg border border-line bg-surface p-24 sm:p-32 shadow-artistic"
     >
-      <div className="absolute inset-0 opacity-30 bg-grid [background-size:24px_24px]" />
-      <div className="relative grid gap-16 md:grid-cols-2 items-center">
+      <div className="relative grid gap-20 md:grid-cols-2 md:items-center">
         <div>
-          <p className="label-caps opacity-80">Welcome back</p>
-          <h1 className="display text-36 sm:text-48 mt-4 leading-tight">{user.split(" ")[0]}</h1>
-          <p className="mt-8 opacity-90">
-            Track · <span className="font-mono">{course}</span>
+          <p className="label-caps">Welcome back</p>
+          <h1 className="display text-30 sm:text-36 mt-8 leading-tight text-ink font-normal">
+            {user.split(" ")[0]}
+          </h1>
+          <p className="mt-10 text-16 text-secondary">
+            Track · <span className="text-ink">{course}</span>
           </p>
           {nextTitle && (
             <Link
               to={`/student/module/${nextId}`}
-              className="inline-flex items-center gap-8 mt-16 rounded-md bg-surface text-ink font-mono text-12 uppercase tracking-widest px-16 py-12 shadow-bold hover:translate-y-[-2px] transition-transform"
+              className="mt-16 inline-flex items-center gap-8 rounded-md border border-ink bg-ink px-16 py-12 font-body text-14 text-surface transition-opacity hover:opacity-90"
             >
               Continue → {nextTitle}
             </Link>
@@ -272,9 +273,9 @@ function Hero({
 
 function Stat({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
   return (
-    <div className="rounded-md bg-surface/15 px-16 py-12 backdrop-blur-sm border border-surface/20">
-      <p className="label-caps opacity-80">{label}</p>
-      <p className="display text-36 mt-4">{loading ? "—" : value}</p>
+    <div className="rounded-md border border-line bg-neutral px-16 py-12">
+      <p className="label-caps">{label}</p>
+      <p className="display text-32 mt-8 text-ink">{loading ? "—" : value}</p>
     </div>
   );
 }
@@ -315,12 +316,12 @@ function DnaRadar({ dna }: { dna: DNAVector }) {
         <polygon
           points={points.map(([x, y]) => `${x},${y}`).join(" ")}
           fill="url(#dnaGrad)"
-          fillOpacity="0.5"
-          stroke="#8B5CF6"
-          strokeWidth="2"
+          fillOpacity="0.35"
+          stroke="#525252"
+          strokeWidth="1.5"
         />
         {points.map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={3.5} fill="#8B5CF6" />
+          <circle key={i} cx={x} cy={y} r={3.5} fill="#404040" />
         ))}
         {labelPts.map(({ x, y, d }) => (
           <text
@@ -330,28 +331,28 @@ function DnaRadar({ dna }: { dna: DNAVector }) {
             textAnchor="middle"
             dominantBaseline="middle"
             fontSize="9"
-            fontFamily="JetBrains Mono"
-            fill="rgba(17,24,39,0.65)"
+            fontFamily="Times New Roman, Times, serif"
+            fill="rgba(38,38,38,0.7)"
           >
             {DIM_LABEL[d].label.toUpperCase()}
           </text>
         ))}
         <defs>
           <linearGradient id="dnaGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#3B82F6" />
-            <stop offset="100%" stopColor="#8B5CF6" />
+            <stop offset="0%" stopColor="#d4d4d4" />
+            <stop offset="100%" stopColor="#a3a3a3" />
           </linearGradient>
         </defs>
       </svg>
-      <ul className="space-y-4 text-12 font-mono">
+      <ul className="space-y-4 text-12 font-body">
         {dims.map((d) => (
           <li key={d} className="flex items-center gap-8">
-            <span className="inline-block w-2 h-2 rounded-full bg-secondary" />
-            <span className="text-ink/70 w-20">{DIM_LABEL[d].label}</span>
-            <span className="text-ink/40">
+            <span className="inline-block h-2 w-2 rounded-full bg-line ring-1 ring-ink/10" />
+            <span className="w-24 text-ink/75">{DIM_LABEL[d].label}</span>
+            <span className="text-secondary">
               {DIM_LABEL[d].lo} → {DIM_LABEL[d].hi}
             </span>
-            <span className="ml-auto text-primary">{fmtPct(dna[d])}</span>
+            <span className="ml-auto text-ink font-medium">{fmtPct(dna[d])}</span>
           </li>
         ))}
       </ul>
@@ -365,13 +366,13 @@ function CareerHighlight({ career }: { career: Career }) {
     <div>
       <p className="display text-24 mb-8">{top.role_title}</p>
       <ProgressBar value={top.match_pct / 100} label={`Match · ${Math.round(top.match_pct)}%`} />
-      <div className="mt-12 grid grid-cols-2 gap-8 text-12 font-mono">
-        <div className="rounded-md bg-ink/5 px-8 py-4">
-          <span className="text-ink/50">Salary</span>
+      <div className="mt-12 grid grid-cols-2 gap-8 text-12 font-body">
+        <div className="rounded-md border border-line bg-neutral px-8 py-8">
+          <span className="text-secondary">Salary</span>
           <p className="text-ink">PKR {career.roles[0].salary_pkr_min / 1000}k–{career.roles[0].salary_pkr_max / 1000}k</p>
         </div>
-        <div className="rounded-md bg-ink/5 px-8 py-4">
-          <span className="text-ink/50">Weeks to ready</span>
+        <div className="rounded-md border border-line bg-neutral px-8 py-8">
+          <span className="text-secondary">Weeks to ready</span>
           <p className="text-ink">{top.weeks_to_ready ?? "—"}</p>
         </div>
       </div>
@@ -395,7 +396,7 @@ function BurnoutBadge({ dna }: { dna: DNAVector | null }) {
         <span
           className={cn(
             "inline-flex h-12 w-12 items-center justify-center rounded-md",
-            lateNight ? "bg-warning/20 text-warning" : "bg-success/20 text-success",
+            lateNight ? "border border-line bg-neutral text-warning" : "border border-line bg-neutral text-success",
           )}
         >
           <Icon name={lateNight ? "alert" : "check"} size={18} />
@@ -410,7 +411,7 @@ function BurnoutBadge({ dna }: { dna: DNAVector | null }) {
         </div>
       </div>
       <p className="label-caps text-secondary mt-12">Signals</p>
-      <ul className="text-12 mt-4 space-y-2 text-ink/70 font-mono">
+      <ul className="text-12 mt-4 space-y-2 text-secondary font-body">
         <li>· Pace: {fmtPct(dna.pace)}</li>
         <li>· Time of day: {fmtPct(dna.time_of_day)}</li>
       </ul>
@@ -420,8 +421,6 @@ function BurnoutBadge({ dna }: { dna: DNAVector | null }) {
 
 function heatColor(p: number): string {
   const t = Math.max(0, Math.min(1, p));
-  // gradient from danger -> warning -> primary -> success
-  if (t < 0.33) return `rgba(220,38,38,${0.25 + t * 0.6})`;
-  if (t < 0.66) return `rgba(217,119,6,${0.3 + t * 0.5})`;
-  return `rgba(22,163,74,${0.35 + t * 0.55})`;
+  const a = 0.18 + t * 0.42;
+  return `rgba(64, 64, 64, ${a})`;
 }
