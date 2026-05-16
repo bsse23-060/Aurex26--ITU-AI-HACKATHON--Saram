@@ -1,0 +1,24 @@
+HTTP/1.1 200 OK
+date: Thu, 14 May 2026 05:51:39 GMT
+server: uvicorn
+request-id: uv1iDNhFtoqQFRW9hDcU
+access-control-expose-headers: request-id, history-item-id, character-cost, regeneration-count, generation-info, current-concurrent-requests, maximum-concurrent-requests
+history-item-id: iOQiHjcQSjMYfCJVmEhy
+current-concurrent-requests: 1
+workspace-concurrent-requests: 1
+maximum-concurrent-requests: 2
+character-cost: 25
+tts-latency-ms: 712
+Content-Length: 30137
+content-type: audio/mpeg
+vary: Accept-Language
+access-control-allow-origin: *
+access-control-allow-headers: *
+access-control-allow-methods: POST, PATCH, OPTIONS, DELETE, GET, PUT
+access-control-max-age: 600
+Strict-Transport-Security: max-age=1800;
+x-trace-id: edf9e13a4be2271c3b182c29214eb28e
+x-region: europe-west4
+Via: 1.1 google
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+

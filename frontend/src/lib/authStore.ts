@@ -9,6 +9,7 @@ type AuthState = {
   refreshUser: () => Promise<void>;
   logout: () => void;
   login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, full_name: string) => Promise<User>;
 };
 
 export const useAuth = create<AuthState>()(
@@ -22,6 +23,14 @@ export const useAuth = create<AuthState>()(
         const data = await api<{ access_token: string; user: User }>("/api/auth/login", {
           method: "POST",
           body: JSON.stringify({ email, password }),
+        });
+        set({ token: data.access_token, user: data.user });
+        return data.user;
+      },
+      register: async (email, password, full_name) => {
+        const data = await api<{ access_token: string; user: User }>("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ email, password, full_name }),
         });
         set({ token: data.access_token, user: data.user });
         return data.user;
