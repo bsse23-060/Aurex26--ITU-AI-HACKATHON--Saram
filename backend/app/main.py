@@ -58,6 +58,22 @@ if FRONTEND_DIST.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIST), name="frontend")
 
 
+app.include_router(auth_router.router)
+app.include_router(courses_router.router)
+app.include_router(onboarding_router.router)
+app.include_router(student_router.router)
+app.include_router(gct_router.router)
+app.include_router(tutor_router.router)
+app.include_router(instructor_router.router)
+app.include_router(admin_courses_router.router)
+
+
+_log.info("Registered routes:")
+for _r in app.routes:
+    _methods = getattr(_r, "methods", None)
+    _log.info("  %s %s", _r.path, _methods)
+
+
 @app.get("/", response_class=HTMLResponse)
 def root():
     """Serve the SPA when the frontend is built, otherwise show the backend landing page."""
@@ -116,11 +132,3 @@ def health():
     }
 
 
-app.include_router(auth_router.router)
-app.include_router(courses_router.router)
-app.include_router(onboarding_router.router)
-app.include_router(student_router.router)
-app.include_router(gct_router.router)
-app.include_router(tutor_router.router)
-app.include_router(instructor_router.router)
-app.include_router(admin_courses_router.router)
