@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-canvas text-ink;
+  }
+  body {
+    @apply font-body text-16 font-book min-h-screen text-ink bg-canvas;
+    background-image: linear-gradient(165deg, rgb(236 253 245) 0%, rgb(244 251 249) 42%, rgb(240 253 250) 100%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-aqua-soft text-ink;
+  }
+}
+
+@layer components {
+  .display {
+    @apply font-display tracking-normal font-normal;
+  }
+  .label-caps {
+    @apply font-body text-12 uppercase tracking-[0.12em] text-secondary;
+  }
+  .card {
+    @apply rounded-lg bg-surface shadow-artistic border border-line;
+  }
+  .pill {
+    @apply inline-flex items-center gap-8 rounded-sm px-12 py-4 font-body text-12 uppercase tracking-widest border border-line/80 bg-mint text-ink;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-8 rounded-md px-16 py-12 font-body text-14 text-surface bg-primary border border-primary hover:bg-primary/90 active:opacity-95 transition-opacity;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-8 rounded-md px-16 py-12 font-body text-14 text-ink border border-line bg-surface hover:bg-aqua-soft hover:border-primary/25 transition-colors;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(15, 118, 110, 0.22);
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 118, 110, 0.38);
+  }
+}
