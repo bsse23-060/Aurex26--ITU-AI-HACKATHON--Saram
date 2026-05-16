@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from .bootstrap import startup
 from .config import settings
@@ -25,6 +27,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
 )
 _log = logging.getLogger(__name__)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -49,10 +53,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+  if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIST), name="frontend")
+
 
 @app.get("/", response_class=HTMLResponse)
 def root():
-    """Backend API only — the React app runs on port 5173. This page avoids a bare 404 on :8000/."""
+    """Serve the SPA when the frontend is built, otherwise show the backend landing page."""
+
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+  return index_file.read_text(encoding="utf-8")
 
     return """<!DOCTYPE html>
 <html lang="en">
@@ -78,6 +90,17 @@ def root():
   <p><small>Console noise from browser extensions (e.g. NinjaHumanizer) is unrelated to this app.</small></p>
 </body>
 </html>"""
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+def spa_fallback(full_path: str):
+    if full_path.startswith("api/") or full_path in {"docs", "redoc", "openapi.json"}:
+        return HTMLResponse(status_code=404, content="Not found")
+
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+        return index_file.read_text(encoding="utf-8")
+
+    return HTMLResponse(status_code=404, content="Frontend build not found")
 
 
 @app.get("/api/health")
