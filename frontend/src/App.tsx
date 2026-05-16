@@ -57,6 +57,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomeGate />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<LoginPage initialMode="register" />} />
         <Route
           path="/onboarding"
           element={

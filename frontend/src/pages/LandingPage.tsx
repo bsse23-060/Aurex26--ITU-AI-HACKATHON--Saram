@@ -11,7 +11,7 @@ export function LandingPage() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const q = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : "";
-    navigate(`/login${q}`);
+    navigate(`/signup${q}`);
   }
 
   return (
@@ -88,7 +88,7 @@ export function LandingPage() {
                 Start your adaptive path
               </p>
 
-              <form onSubmit={onSubmit} className="flex max-w-md flex-col gap-3 sm:flex-row sm:items-stretch">
+              <form onSubmit={onSubmit} className="max-w-md space-y-3">
                 <label className="sr-only" htmlFor="landing-email">
                   Email
                 </label>
@@ -98,15 +98,39 @@ export function LandingPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your e-mail"
-                  className="min-h-[48px] flex-1 border border-black/[0.12] bg-white px-4 text-[15px] text-[#1a1a1a] placeholder:text-[#9a9a9a] outline-none transition-shadow focus:shadow-[inset_0_0_0_1px_rgba(26,26,26,0.15)]"
+                  className="min-h-[48px] w-full border border-black/[0.12] bg-white px-4 text-[15px] text-[#1a1a1a] placeholder:text-[#9a9a9a] outline-none transition-shadow focus:shadow-[inset_0_0_0_1px_rgba(26,26,26,0.15)]"
                 />
-                <button
-                  type="submit"
-                  className="min-h-[48px] shrink-0 border border-[#6d8468] bg-[#7d9471] px-8 text-[14px] text-white transition-colors hover:bg-[#6d8468] sm:px-10"
-                >
-                  Sign up
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="submit"
+                    className="min-h-[48px] shrink-0 border border-[#6d8468] bg-[#7d9471] px-8 text-[14px] text-white transition-all hover:-translate-y-0.5 hover:bg-[#6d8468] sm:px-10"
+                  >
+                    Sign up
+                  </button>
+                  <Link
+                    to={email.trim() ? `/login?email=${encodeURIComponent(email.trim())}` : "/login"}
+                    className="inline-flex min-h-[48px] items-center justify-center border border-black/[0.12] bg-white px-8 text-[14px] transition-all hover:-translate-y-0.5 hover:border-black/[0.22] hover:bg-[#fbfbf9] sm:px-10"
+                  >
+                    Try demo login
+                  </Link>
+                </div>
               </form>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                {[
+                  "Adaptive roadmap",
+                  "AI tutor",
+                  "Mastery tracking",
+                  "Roman Urdu support",
+                ].map((tag) => (
+                  <span
+                    key={tag}
+                    className="cursor-default rounded-full border border-black/[0.08] bg-white/70 px-3 py-1 text-[12px] text-[#4a4a4a] transition-transform hover:-translate-y-0.5"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
 
               <p className="mt-8 max-w-sm text-[13px] leading-relaxed text-[#666]">
                 Smart LMS for atomcamp — roadmaps, mastery tracking, and an AI tutor tuned to how
