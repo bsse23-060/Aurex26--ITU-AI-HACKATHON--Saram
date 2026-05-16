@@ -53,7 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-  if FRONTEND_DIST.exists():
+if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
     app.mount("/static", StaticFiles(directory=FRONTEND_DIST), name="frontend")
 
@@ -64,7 +64,7 @@ def root():
 
     index_file = FRONTEND_DIST / "index.html"
     if index_file.exists():
-  return index_file.read_text(encoding="utf-8")
+        return index_file.read_text(encoding="utf-8")
 
     return """<!DOCTYPE html>
 <html lang="en">
