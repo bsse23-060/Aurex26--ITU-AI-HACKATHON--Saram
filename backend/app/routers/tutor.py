@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import List
-
 import logging
+import os
+from typing import List
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -15,12 +15,62 @@ logger = logging.getLogger(__name__)
 from ..ai.language_detect import detect_language
 from ..ai.tutor_rag import TutorAnswer, answer as rag_answer
 from ..auth import get_current_user, require_student
-from ..config import settings
+from ..config import BACKEND_ROOT, settings
 from ..database import get_db
 from ..models import Concept, Mastery, Module, TutorMessage, User
 from ..schemas.tutor import TutorCitation, TutorMessageOut, TutorRequest, TutorResponse
 
 router = APIRouter(prefix="/api/tutor", tags=["tutor"])
+
+
+def _live_env_value(name: str, fallback: str = "") -> str:
+    """Read an env var directly from .env at call time.
+
+    pydantic-settings caches the `.env` snapshot taken at process boot via
+    ``@lru_cache`` in ``app.config``. That means rotating an API key in ``.env``
+    has no effect until uvicorn is fully restarted (``--reload`` watches .py
+    only). For the voice keys we therefore re-read ``.env`` on every call so a
+    fresh key takes effect immediately. Order of precedence:
+
+    1. ``os.environ`` (real env var wins, useful for prod overrides).
+    2. ``BACKEND_ROOT/.env`` parsed live via ``python-dotenv``.
+    3. ``fallback`` (the cached pydantic-settings value).
+    """
+
+    env_val = (os.environ.get(name) or "").strip()
+    if env_val:
+        return env_val
+    try:
+        from dotenv import dotenv_values
+
+        snapshot = dotenv_values(BACKEND_ROOT / ".env")
+        disk_val = (snapshot.get(name) or "").strip()
+        if disk_val:
+            return disk_val
+    except Exception:  # noqa: BLE001 - dotenv is optional / never fatal
+        pass
+    return fallback
+
+
+def _eleven_api_key() -> str:
+    return _live_env_value("ELEVENLABS_API_KEY", settings.elevenlabs_api_key).strip()
+
+
+def _eleven_voice_id() -> str:
+    return (
+        _live_env_value("ELEVENLABS_VOICE_ID", settings.elevenlabs_voice_id)
+        or "EXAVITQu4vr4xnSDxMaL"
+    ).strip()
+
+
+def _groq_api_key() -> str:
+    return _live_env_value("GROQ_API_KEY", settings.groq_api_key).strip()
+
+
+def _tail(value: str, n: int = 4) -> str:
+    """Last n chars of a secret; for display-only verification."""
+
+    return value[-n:] if value else ""
 
 
 def _weak_concept_ids(db: Session, user: User) -> List[int]:
@@ -100,14 +150,20 @@ def history(
 
 @router.get("/voice/status")
 def voice_status():
+    el_key = _eleven_api_key()
+    groq_key = _groq_api_key()
     return {
         # legacy field used by the older frontend chat; mirrors tts_enabled
-        "enabled": settings.has_elevenlabs,
-        "tts_enabled": settings.has_elevenlabs,
-        "stt_enabled": settings.has_groq,
-        "voice_id": settings.elevenlabs_voice_id if settings.has_elevenlabs else None,
-        "stt_model": "whisper-large-v3" if settings.has_groq else None,
+        "enabled": bool(el_key),
+        "tts_enabled": bool(el_key),
+        "stt_enabled": bool(groq_key),
+        "voice_id": _eleven_voice_id() if el_key else None,
+        "stt_model": "whisper-large-v3" if groq_key else None,
         "stt_languages": ["auto", "en", "ur"],
+        # Display-only tail of each loaded key so the operator can verify
+        # which key the backend is actually using (e.g. after rotating .env).
+        "tts_key_tail": _tail(el_key),
+        "stt_key_tail": _tail(groq_key),
     }
 
 
@@ -123,17 +179,20 @@ def tts(payload: dict, user: User = Depends(get_current_user)):
     text = (payload or {}).get("text", "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
-    if not settings.has_elevenlabs:
+
+    api_key = _eleven_api_key()
+    if not api_key:
         raise HTTPException(status_code=503, detail="ElevenLabs not configured")
 
-    voice_id = (settings.elevenlabs_voice_id or "EXAVITQu4vr4xnSDxMaL").strip()
+    voice_id = _eleven_voice_id()
     # eleven_multilingual_v2 supports English + Urdu (Roman Urdu is read phonetically).
     # eleven_turbo_v2_5 is faster but English-leaning and gated for some accounts.
     model_id = (payload or {}).get("model_id") or "eleven_multilingual_v2"
+    logger.info("ElevenLabs TTS request key=…%s voice=%s chars=%d", _tail(api_key), voice_id, len(text))
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     headers = {
-        "xi-api-key": settings.elevenlabs_api_key,
+        "xi-api-key": api_key,
         "Accept": "audio/mpeg",
         "Content-Type": "application/json",
     }
@@ -220,7 +279,8 @@ async def stt(
     Returns the recognised text plus the detected language code.
     """
 
-    if not settings.has_groq:
+    groq_key = _groq_api_key()
+    if not groq_key:
         raise HTTPException(status_code=503, detail="Speech-to-text not configured (set GROQ_API_KEY)")
 
     content_type = (audio.content_type or "").lower()
@@ -259,7 +319,7 @@ async def stt(
         with httpx.Client(timeout=60.0) as client:
             resp = client.post(
                 "https://api.groq.com/openai/v1/audio/transcriptions",
-                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                headers={"Authorization": f"Bearer {groq_key}"},
                 files=files,
             )
     except httpx.HTTPError as exc:

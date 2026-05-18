@@ -21,12 +21,35 @@ function destFor(role: string): string {
   return "/student";
 }
 
+type Mode = "signin" | "signup";
+
+function parseApiError(err: unknown, fallback: string): string {
+  if (!(err instanceof ApiError)) return fallback;
+  // FastAPI returns { detail: "..." } or { detail: [...] }; try to surface it cleanly.
+  if (err.body) {
+    try {
+      const data = JSON.parse(err.body);
+      const d = data?.detail;
+      if (typeof d === "string") return `${err.status}: ${d}`;
+      if (Array.isArray(d) && d[0]?.msg) return `${err.status}: ${d[0].msg}`;
+    } catch {
+      // not JSON - fall through
+    }
+    return `${err.status}: ${err.body}`;
+  }
+  return `${err.status}: ${err.message}`;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const login = useAuth((s) => s.login);
+  const register = useAuth((s) => s.register);
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("student@atomcamp.dev");
   const [password, setPassword] = useState("student123");
+  const [fullName, setFullName] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [demos, setDemos] = useState<DemoAccount[]>([]);
@@ -34,6 +57,7 @@ export function LoginPage() {
   useEffect(() => {
     const q = params.get("email");
     if (q) setEmail(q);
+    if (params.get("mode") === "signup") setMode("signup");
   }, [params]);
 
   useEffect(() => {
@@ -43,15 +67,54 @@ export function LoginPage() {
       .catch(() => setDemos([]));
   }, []);
 
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+    if (next === "signup") {
+      // Start with a clean slate when the visitor opens "Create account".
+      setEmail("");
+      setPassword("");
+      setFullName("");
+      setConfirm("");
+    } else {
+      setEmail("student@atomcamp.dev");
+      setPassword("student123");
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === "signup") {
+      if (fullName.trim().length < 2) {
+        setError("Please enter your full name.");
+        return;
+      }
+      if (password.length < 4) {
+        setError("Password must be at least 4 characters.");
+        return;
+      }
+      if (password !== confirm) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const u = await login(email, password);
-      navigate(destFor(u.role), { replace: true });
+      const u =
+        mode === "signup"
+          ? await register(email.trim(), password, fullName.trim())
+          : await login(email, password);
+      // New accounts are always students with no enrolled course.
+      if (mode === "signup" || (u.role === "student" && !u.enrolled_course_id)) {
+        navigate("/onboarding", { replace: true });
+      } else {
+        navigate(destFor(u.role), { replace: true });
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? `${err.status}: ${err.body ?? err.message}` : "Login failed");
+      setError(parseApiError(err, mode === "signup" ? "Sign-up failed" : "Login failed"));
     } finally {
       setLoading(false);
     }
@@ -66,7 +129,7 @@ export function LoginPage() {
       const u = await login(acc.email, acc.password);
       navigate(destFor(u.role), { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? `${err.status}: ${err.body ?? err.message}` : "Login failed");
+      setError(parseApiError(err, "Login failed"));
     } finally {
       setLoading(false);
     }
@@ -116,10 +179,41 @@ export function LoginPage() {
           transition={{ duration: 0.45, delay: 0.08 }}
           className="card relative border-l-[3px] border-l-ink/30 p-24 sm:p-32"
         >
-          <h2 className="display text-30 mb-8 font-normal">Sign in</h2>
-          <p className="text-14 text-secondary mb-24">Use a demo account below or your own credentials.</p>
+          <div
+            role="tablist"
+            aria-label="Sign in or sign up"
+            className="mb-20 inline-flex rounded-md border border-line bg-canvas p-4"
+          >
+            {(["signin", "signup"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                disabled={loading}
+                onClick={() => switchMode(m)}
+                className={cn(
+                  "rounded px-14 py-6 font-body text-13 tracking-wide transition-colors disabled:opacity-50",
+                  mode === m
+                    ? "bg-surface text-ink shadow-[0_1px_0_rgba(15,118,110,0.08)] border border-line"
+                    : "text-secondary hover:text-ink",
+                )}
+              >
+                {m === "signin" ? "Sign in" : "Create account"}
+              </button>
+            ))}
+          </div>
 
-          {demos.length > 0 && (
+          <h2 className="display text-30 mb-8 font-normal">
+            {mode === "signin" ? "Sign in" : "Create your account"}
+          </h2>
+          <p className="text-14 text-secondary mb-24">
+            {mode === "signin"
+              ? "Use a demo account below or your own credentials."
+              : "Sign up as a new learner. You'll set your Learning DNA and choose a track next."}
+          </p>
+
+          {mode === "signin" && demos.length > 0 && (
             <div className="mb-24 space-y-8">
               <p className="label-caps">Demo accounts</p>
               <div className="flex flex-col gap-8">
@@ -150,6 +244,19 @@ export function LoginPage() {
           )}
 
           <form onSubmit={onSubmit} className="space-y-16">
+            {mode === "signup" && (
+              <Field label="Full name">
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="input"
+                  autoComplete="name"
+                  placeholder="e.g. Ayesha Ahmed"
+                  required
+                />
+              </Field>
+            )}
             <Field label="Email">
               <input
                 type="email"
@@ -157,6 +264,8 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="input"
                 autoComplete="email"
+                placeholder={mode === "signup" ? "you@example.com" : ""}
+                required
               />
             </Field>
             <Field label="Password">
@@ -165,17 +274,58 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input"
-                autoComplete="current-password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                minLength={4}
+                placeholder={mode === "signup" ? "At least 4 characters" : ""}
+                required
               />
             </Field>
+            {mode === "signup" && (
+              <Field label="Confirm password">
+                <input
+                  type="password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="input"
+                  autoComplete="new-password"
+                  minLength={4}
+                  required
+                />
+              </Field>
+            )}
             {error && (
               <p className="rounded-md border border-danger/40 bg-danger/10 px-12 py-8 font-body text-14 text-danger">
                 {error}
               </p>
             )}
             <Button type="submit" loading={loading} className="w-full">
-              Sign in
+              {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
+            <p className="text-center text-13 text-secondary">
+              {mode === "signin" ? (
+                <>
+                  New to atomcamp?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signup")}
+                    className="font-medium text-ink underline-offset-2 hover:underline"
+                  >
+                    Create an account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signin")}
+                    className="font-medium text-ink underline-offset-2 hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
           </form>
         </motion.div>
       </div>
